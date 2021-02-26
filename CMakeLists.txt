@@ -13,7 +13,7 @@ set(GENERATED_CPP ${PROJECT_SOURCE_DIR}/generated.cpp)
 
 macro(HeaderTool ParseDirectory)
     add_custom_target(OUTPUT ${GENERATED_HEADER} ${GENERATED_CPP}
-                        COMMAND RPCHeaderTool  ${ParseDirectory})
+                        COMMAND RPCHeaderTool ${ParseDirectory})
 endmacro()
 
 set(SOURCE

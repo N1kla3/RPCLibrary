@@ -11,10 +11,6 @@ add_subdirectory(RPCHeaderTool)
 set(GENERATED_HEADER ${PROJECT_SOURCE_DIR}/generated.h)
 set(GENERATED_CPP ${PROJECT_SOURCE_DIR}/generated.cpp)
 
-macro(HeaderTool ParseDirectory)
-    add_custom_target(OUTPUT ${GENERATED_HEADER} ${GENERATED_CPP}
-                        COMMAND RPCHeaderTool ${ParseDirectory})
-endmacro()
 
 set(SOURCE
         RPC.cpp
@@ -32,6 +28,12 @@ set(SOURCE
         SocketUtil.h
         NetworkManager.cpp
         NetworkManager.h)
+
+macro(HeaderTool ParseDirectory OutputDir Headers)
+    add_custom_target(OUTPUT ${GENERATED_HEADER} ${GENERATED_CPP}
+            COMMAND RPCHeaderTool ${ParseDirectory} ${OutputDir}
+            DEPEND ${Headers})
+endmacro()
 
 add_library(RPClibrary ${SOURCE})
 target_precompile_headers(RPClibrary PUBLIC RPC.h)

@@ -88,6 +88,9 @@ public:
     /** @brief Should be called in while, do nothing if MANUAL mode enabled */
     void Tick(float deltaTime);
 
+    /** @brief In manual mode, executes all received functions */
+    void ReceiveData();
+
 protected:
 
 	// Security functions

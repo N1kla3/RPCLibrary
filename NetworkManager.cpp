@@ -204,9 +204,8 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 			received = socket->Receive(&data_len, sizeof(data_len));
 			if (received > 0)
 			{
-				char buffer[1024];
+				char buffer[2048];
 				received = socket->Receive(buffer, data_len);
-				//TODO big packet
 				if (received > 0)
 				{
 					InputMemoryBitStream stream(buffer, data_len);
@@ -237,6 +236,14 @@ void NetworkManager::Server_HandleClients()
 	{
 		 LOG_INFO(handling client ) << name;
 		 HandlePacket(socket);
+	}
+}
+
+void NetworkManager::ReceiveData()
+{
+	if (m_Mode == MANAGER_MODE::MANUAL)
+	{
+
 	}
 }
 

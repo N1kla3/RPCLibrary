@@ -8,8 +8,8 @@ find_package(Boost REQUIRED COMPONENTS log log_setup REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 add_subdirectory(RPCHeaderTool)
 
-set(GENERATED_HEADER ${PROJECT_SOURCE_DIR}/generated.h)
-set(GENERATED_CPP ${PROJECT_SOURCE_DIR}/generated.cpp)
+set(GENERATED_HEADER ${PROJECT_SOURCE_DIR}/rpc.generated.h)
+set(GENERATED_CPP ${PROJECT_SOURCE_DIR}/rpc.generated.cpp)
 
 
 set(SOURCE

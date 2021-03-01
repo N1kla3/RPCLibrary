@@ -1,16 +1,15 @@
 //
 // Created by nicola on 26/02/2021.
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <filesystem>
 
 using std::string;
 
 void GenerateHeader(const string& pathToProjectSource, const string& whereToGenerate);
-void GenerateCpp(const string& pathToProjectSource, const string& whereToGenerate);
-void parseToHeader(const string& inFile, const string& pathTogeneratedFile);
-void parseToCpp(const string& inFile, const string& pathTogeneratedFile);
+void parseToHeader(const string& inFile, const string& pathToGeneratedFile);
+void parseToCpp(const string& inFile, const string& pathToGeneratedFile);
 
 // first param - path to files for parsing
 // second param - path to output folder
@@ -32,27 +31,45 @@ void GenerateHeader(const string& pathToProjectSource, const string& whereToGene
 	auto header_path = whereToGenerate + "/gen.network.h";
 	auto cpp_path = whereToGenerate + "/gen.network.cpp";
 
-    std::ofstream header(header_path);
+	std::ofstream header(header_path);
 	if (header.is_open())
-    {
-	    header << "//Generated file !!!\n";
+	{
+		header << "//Generated file !!!\n";
 		header << "#pragma once\n";
-		header << "#include\"RPCManager\"\n";
-		header << "#include\"NetworkManager\"\n";
 		header.close();
-		for (const auto& file : std::filesystem::directory_iterator(pathToProjectSource))
-        {
-            std::string path_file = file.path().string();
-			if (*(path_file.cend()-1) == 'h')
-            {
-				std::cout << path_file;
-			}
+	}
+	else std::cout << "cant open file\n";
+
+	std::ofstream cpp(cpp_path);
+	if (cpp.is_open())
+	{
+		cpp << "#include\"gen.network.h\"\n";
+		cpp << "#include\"RPCManager\"\n";
+		cpp << "#include\"NetworkManager\"\n";
+		cpp.close();
+	}
+	else std::cout << "cant open file\n";
+
+	for (const auto& file : std::filesystem::directory_iterator(pathToProjectSource))
+	{
+		std::string path_file = file.path().string();
+		if (*(path_file.cend() - 1) == 'h')
+		{
+			parseToHeader(path_file, header_path);
+			parseToCpp(path_file, cpp_path);
 		}
 	}
-	else std::cout << "cant open file";
 }
 
-void GenerateCpp(const string& pathToProjectSource, const string& whereToGenerate)
+void parseToHeader(const string& inFile, const string& pathToGeneratedFile)
 {
+	std::ifstream header(inFile);
+	if (header.is_open())
+    {
+		header.close();
+	}
+}
 
+void parseToCpp(const string& inFile, const string& pathToGeneratedFile)
+{
 }

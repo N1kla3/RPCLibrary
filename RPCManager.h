@@ -8,7 +8,7 @@
 #include <unordered_map>
 
 /** @brief Empty macro for rpc parser */
-#define RPC(id)
+#define RPCfunction()
 
 typedef void (*RPCWrapFunction)(class InputMemoryBitStream&);
 

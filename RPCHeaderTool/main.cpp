@@ -95,7 +95,7 @@ void parseToHeader(const string& inFile, const string& headerPath, const string&
 	    gen_cpp << parser.GetReadDefinitions();
 		gen_cpp << parser.GetWriteDefinitions();
 
-		//TODO add to header
+		//TODO remake it
 		gen_cpp << "void InitRPC(){";
 		gen_cpp << parser.GetRegistrations();
 		gen_cpp << "}";

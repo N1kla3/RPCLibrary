@@ -52,6 +52,7 @@ public:
 
     virtual ~NetworkManager();
 
+	//TODO check of stream creating
     template<typename T>
     void AddDataToPacket(T value)
     {

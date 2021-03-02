@@ -12,14 +12,23 @@ public:
 	FunctionParser() = default;
 	bool ParseDeclaration(const std::string& line);
 
-	std::string GetReadDeclarations() const;
-	std::string GetWriteDeclarations() const;
-	std::string GetReadDefinitions() const;
-	std::string GetWriteDefinitions() const;
-	std::string GetRegistrations() const;
+	[[nodiscard]] std::string GetReadDeclarations() const;
+	[[nodiscard]] std::string GetWriteDeclarations() const;
+	[[nodiscard]] std::string GetReadDefinitions() const;
+	[[nodiscard]] std::string GetWriteDefinitions() const;
+	[[nodiscard]] std::string GetRegistrations() const;
 
 private:
-	void ParseDefinition();
+	void ParseDefinition(const std::string& string);
+	void ParseArguments(const std::string& str);
+	void ParseArg(const std::string& str);
+
+	// Generation utility functions
+	[[nodiscard]] std::string GenerateReadDeclaration() const;
+	[[nodiscard]] std::string GenerateWriteDeclaration() const;
+	[[nodiscard]] std::string GenerateReadDefinition() const;
+	[[nodiscard]] std::string GenerateWriteDefinition() const;
+	[[nodiscard]] std::string GenerateRegistrations() const;
 
 	std::string name;
 	std::vector<std::string> m_Args{};
@@ -30,7 +39,7 @@ private:
 	std::string m_ReadDefinitions;
 	std::string m_WriteDefinitions;
 
-	std::string m_registrations;
+	std::string m_Registrations;
 };
 
 

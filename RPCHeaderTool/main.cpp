@@ -35,6 +35,7 @@ void GenerateHeader(const string& pathToProjectSource, const string& whereToGene
 	{
 		header << "//Generated file !!!\n";
 		header << "#pragma once\n";
+		header << "void InitRPC();";
 		header.close();
 	}
 	else std::cout << "cant open file\n";

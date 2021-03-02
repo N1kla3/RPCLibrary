@@ -18,7 +18,7 @@ public:
     RPCManager() = delete;
     virtual ~RPCManager() = delete;
 
-    inline static void RegisterFunction(RPCWrapFunction func, uint32_t id)
+    inline static void RegisterFunction(RPCWrapFunction func, const std::string& id)
     {
         if (m_WrappedFunctions.at(id) != nullptr)
         {
@@ -32,7 +32,7 @@ public:
         }
     }
 
-    inline static void Proccess(uint32_t id, InputMemoryBitStream& inStream)
+    inline static void Proccess(const std::string& id, InputMemoryBitStream& inStream)
     {
         if (m_WrappedFunctions.find(id) != m_WrappedFunctions.end())
         {
@@ -46,5 +46,5 @@ public:
     }
 
 protected:
-    inline static std::unordered_map<uint32_t, RPCWrapFunction> m_WrappedFunctions{};
+    inline static std::unordered_map<std::string, RPCWrapFunction> m_WrappedFunctions{};
 };

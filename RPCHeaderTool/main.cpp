@@ -11,6 +11,8 @@ using std::string;
 void GenerateHeader(const string& pathToProjectSource, const string& whereToGenerate);
 void parseToHeader(const string& inFile, const string& headerPath, const string& cppPath);
 
+std::string generations{};
+
 // first param - path to files for parsing
 // second param - path to output folder
 int main(int arg, char** argc)
@@ -58,6 +60,14 @@ void GenerateHeader(const string& pathToProjectSource, const string& whereToGene
 			parseToHeader(path_file, header_path, cpp_path);
 		}
 	}
+    cpp.open(cpp_path, std::ios_base::app);
+	if (cpp.is_open())
+    {
+		cpp << "void InitRPC(){\n";
+		cpp << generations;
+		cpp << "}\n";
+		cpp.close();
+	}
 }
 
 void parseToHeader(const string& inFile, const string& headerPath, const string& cppPath)
@@ -95,10 +105,7 @@ void parseToHeader(const string& inFile, const string& headerPath, const string&
 	    gen_cpp << parser.GetReadDefinitions();
 		gen_cpp << parser.GetWriteDefinitions();
 
-		//TODO remake it
-		gen_cpp << "void InitRPC(){";
-		gen_cpp << parser.GetRegistrations();
-		gen_cpp << "}";
+        generations.append(parser.GetRegistrations());
 	}
 }
 

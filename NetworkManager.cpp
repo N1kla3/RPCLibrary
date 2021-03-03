@@ -213,11 +213,11 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 					{
 						stream.ReadBits(&packet, GetRequiredBits<PACKET::MAX>::VALUE);
 						if (packet == PACKET::FUNCTION)
-						{
+						{//TODO check parser
 							HandleFunctionPacket(stream);
-						}
+						}//TODO accept of clients on server
 					}
-				}
+				}//TODO send with propriate bytes , question
 			}
 			socket->SetNonBlocking();
 		}
@@ -243,7 +243,14 @@ void NetworkManager::ReceiveData()
 {
 	if (m_Mode == MANAGER_MODE::MANUAL)
 	{
-
+		if (m_Type == MANAGER_TYPE::CLIENT)
+        {
+            HandlePacket(m_Socket);
+		}
+		else if (m_Type == MANAGER_TYPE::SERVER)
+        {
+		    Server_HandleClients();
+		}
 	}
 }
 

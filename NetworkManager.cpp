@@ -164,7 +164,7 @@ void NetworkManager::HandleHelloPacket(const TCPSocketPtr& socket)
 /** @brief Read function and executes it */
 void NetworkManager::HandleFunctionPacket(InputMemoryBitStream& stream)
 {
-	uint32_t function_id;
+	std::string function_id;
 	stream.Read(function_id);
 	RPCManager::Proccess(function_id, stream);
 }

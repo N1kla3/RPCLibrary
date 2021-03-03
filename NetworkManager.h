@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "SocketUtil.h"
 #include "Stream.h"
 
@@ -56,7 +58,17 @@ public:
     template<typename T>
     void AddDataToPacket(T value)
     {
-
+        if (!bReadyToWritePacket)
+        {
+		    bReadyToWritePacket = true;
+            m_OutStreamPtr = std::make_unique<OutputMemoryBitStream>();
+			m_OutStreamPtr->WriteBits(PACKET::DATA, GetRequiredBits<PACKET::MAX>::VALUE);
+			m_OutStreamPtr->WriteBits(PACKET::FUNCTION, GetRequiredBits<PACKET::MAX>::VALUE);
+		}
+		if (bReadyToWritePacket)
+        {
+			m_OutStreamPtr->Write(value);
+		}
     }
 
     void CreatePacket();
@@ -108,6 +120,8 @@ protected:
     int bClientConnected:1 = 0;
 
     int bClientApproved:1 = 0;
+
+    int bReadyToWritePacket:1 = 0;
 
 	float m_PreviousDelta = 0.f;
 

@@ -50,7 +50,6 @@ std::string FunctionParser::GetRegistrations() const
 
 void FunctionParser::ParseDefinition(const std::string& string)
 {
-	// TODO what about reutrn value
 	auto iter = string.cbegin();
 	for (; iter != string.cend() || *iter != ' '; iter++);
 	for (auto scope = iter; scope != string.cend(); scope++)
@@ -92,7 +91,6 @@ void FunctionParser::ParseArg(const std::string& str)
     {
 		if (*iter == ' ')
         {
-			//TODO need to think about it
 			m_ArgsTypes.emplace_back(str.cbegin(), iter.base());
             m_Args.emplace_back(iter.base(), str.cend());
 		}
@@ -159,7 +157,7 @@ void FunctionParser::GenerateWriteDefinition() const
             stream << ",";
         }
     }
-    stream << ");}";
+    stream << ");manager.EndFunction();}";
 }
 
 void FunctionParser::GenerateRegistrations() const

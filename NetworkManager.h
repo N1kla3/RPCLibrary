@@ -54,7 +54,6 @@ public:
 
     virtual ~NetworkManager();
 
-	//TODO check of stream creating
     template<typename T>
     void AddDataToPacket(T value)
     {
@@ -62,8 +61,11 @@ public:
         {
 		    bReadyToWritePacket = true;
             m_OutStreamPtr = std::make_unique<OutputMemoryBitStream>();
-			m_OutStreamPtr->WriteBits(PACKET::DATA, GetRequiredBits<PACKET::MAX>::VALUE);
-			m_OutStreamPtr->WriteBits(PACKET::FUNCTION, GetRequiredBits<PACKET::MAX>::VALUE);
+		}
+		if (!bReadyToWriteFunction)
+        {
+            m_OutStreamPtr->WriteBits(PACKET::FUNCTION, GetRequiredBits<PACKET::MAX>::VALUE);
+			bReadyToWriteFunction = false;
 		}
 		if (bReadyToWritePacket)
         {
@@ -71,7 +73,7 @@ public:
 		}
     }
 
-    void CreatePacket();
+	void EndFunction();
 
     void HandlePacket(const TCPSocketPtr& socket);
 
@@ -84,6 +86,8 @@ public:
     void SendRejected(const TCPSocketPtr& socket);
 
     void SendFunction();
+
+	void SendPacket();
 
     /** @brief Check received data per second */
     void SetNetFrequency(float frequency);
@@ -104,6 +108,15 @@ public:
     /** @brief In manual mode, executes all received functions */
     void ReceiveData();
 
+	/** @brief SERVER-ONLY, Async function to accept clients, */
+	void AcceptConnections();
+
+	void Server_Shutdown();
+
+	void Server_DisconnectClient(std::string name);
+
+	void Client_Disconnect();
+
 protected:
 
 	// Security functions
@@ -120,6 +133,8 @@ protected:
     int bClientConnected:1 = 0;
 
     int bClientApproved:1 = 0;
+
+	int bReadyToWriteFunction:1 = 0;
 
     int bReadyToWritePacket:1 = 0;
 

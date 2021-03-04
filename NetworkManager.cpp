@@ -32,11 +32,6 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 NetworkManager::~NetworkManager()
 = default;
 
-void NetworkManager::CreatePacket()
-{
-
-	m_OutStreamPtr = std::make_unique<OutputMemoryBitStream>();
-}
 
 void NetworkManager::SetNetFrequency(float frequency)
 {
@@ -124,6 +119,7 @@ void NetworkManager::Tick(float deltaTime)
 		{
 			HandlePacket(m_Socket);
 		}
+		SendPacket();
 	}
 }
 
@@ -225,7 +221,7 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 		{
 			bClientConnected = false;
 			bClientApproved = false;
-			LOG_WARNING(you have disconnected);
+			LOG_WARNING(you have been disconnected);
 		}
 	}
 }
@@ -254,6 +250,40 @@ void NetworkManager::ReceiveData()
 	}
 }
 
+void NetworkManager::EndFunction()
+{
+	if (bReadyToWriteFunction)
+    {
+		bReadyToWriteFunction = false;
+	}
+}
+
+void NetworkManager::SendPacket()
+{
+    if (bReadyToWritePacket)
+    {
+		OutputMemoryBitStream stream;
+		stream.WriteBits(PACKET::DATA, GetRequiredBits<PACKET::MAX>::VALUE);
+		stream.Write(m_OutStreamPtr->GetByteLength());
+        if (m_Type == MANAGER_TYPE::SERVER)
+        {
+		    for (auto& [name, socket] : *m_ServerConnections)
+            {
+				socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
+				socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
+				LOG_INFO(Send packet to client - ) << name;
+			}
+		}
+		else if (m_Type == MANAGER_TYPE::CLIENT && bClientApproved && bClientConnected)
+        {
+			m_Socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
+			m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
+			LOG_INFO(Send packet to server);
+		}
+	}
+}
+
+//TODO packet data limit
 void ManagerInfo::Write(OutputMemoryBitStream& stream)
 {
 	stream.Write(name);

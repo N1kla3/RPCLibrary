@@ -7,7 +7,6 @@
 #include <iostream>
 
 using std::string;
-//TODO what about return value and overload
 void GenerateHeader(const string& pathToProjectSource, const string& whereToGenerate);
 void parseToHeader(const string& inFile, const string& headerPath, const string& cppPath);
 

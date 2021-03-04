@@ -227,6 +227,26 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 			bClientApproved = false;
 			LOG_WARNING(you have been disconnected);
 		}
+		else if (packet == PACKET::REJECT && m_Type == MANAGER_TYPE::SERVER)
+        {
+			LOG_INFO(receiving disconnect information);
+			socket->SetBlocking();
+			char buffer[512];
+			received = socket->Receive(buffer, sizeof(uint32_t));
+			if (received > 0)
+            {
+				uint32_t len = buffer[0];
+			    received = socket->Receive(buffer, len);
+				if (received > 0)
+                {
+                    InputMemoryBitStream stream(buffer, len);
+                    std::string name;
+                    stream.Read(name);
+                    Server_DisconnectClient(name);
+				}
+			}
+			socket->SetNonBlocking();
+		}
 	}
 }
 
@@ -377,6 +397,18 @@ void NetworkManager::Server_DisconnectClient(std::string name)
 		}
 
 		m_ConnectionsMutex.unlock();
+	}
+}
+
+void NetworkManager::Client_Disconnect()
+{
+	if (m_Type == MANAGER_TYPE::CLIENT)
+    {
+        OutputMemoryBitStream stream;
+		stream.WriteBits(PACKET::REJECT, GetRequiredBits<PACKET::MAX>::VALUE);
+		stream.Write((uint32_t)m_Info.name.size());
+		stream.Write(m_Info.name);
+		m_Socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 	}
 }
 

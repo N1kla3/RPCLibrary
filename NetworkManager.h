@@ -118,10 +118,13 @@ public:
 	/** @brief SERVER-ONLY, Async function to accept clients, */
 	void AcceptConnections();
 
+	/** SERVER-ONLY */
 	void Server_Shutdown();
 
+	/** SERVER-ONLY */
 	void Server_DisconnectClient(std::string name);
 
+	/** CLIENT-ONLY */
 	void Client_Disconnect();
 
 protected:

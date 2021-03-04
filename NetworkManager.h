@@ -4,7 +4,9 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
+#include <thread>
 
 #include "SocketUtil.h"
 #include "Stream.h"
@@ -15,6 +17,7 @@ struct ManagerInfo
 
     void Write(class OutputMemoryBitStream& stream);
     void Read(class InputMemoryBitStream& stream);
+	//TODO fill it in manager
 };
 
 enum SECURITY_LEVEL
@@ -96,9 +99,13 @@ public:
 
     void SetSecurityLevel(SECURITY_LEVEL level) noexcept {m_Level = level;};
 
+	inline void SetConnectionTimeLimit(int newLimit);
+
     [[nodiscard]] MANAGER_MODE GetManagerMode() const;
 
     [[nodiscard]] MANAGER_TYPE GetManagerType() const noexcept;
+
+	[[nodiscard]] inline int GetConnectionTimeLimit() const;
 
     void Connect(const std::string& address);
 
@@ -138,6 +145,8 @@ protected:
 
     int bReadyToWritePacket:1 = 0;
 
+	std::atomic<bool> bPendingShutdown = false;
+
 	float m_PreviousDelta = 0.f;
 
     float m_NetFrequency = 1.f;
@@ -162,4 +171,9 @@ private:
 	std::unique_ptr<std::unordered_map<std::string, ManagerInfo>> m_ServerClientsInfo;
 
 	MANAGER_TYPE m_Type;
+
+	std::mutex m_ConnectionsMutex;
+	std::thread m_AcceptingThread;
+
+	int m_ConnectionTimeLimit = 5;
 };

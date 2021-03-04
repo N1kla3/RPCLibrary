@@ -22,6 +22,8 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 		SocketAddress addr(INADDR_ANY, port);
 		m_Socket->Bind(addr);
 		LOG_INFO(Server at port) << port;
+		m_AcceptingThread = std::thread(&NetworkManager::AcceptConnections, this);
+		LOG_INFO(Maximum threads supported - ) << std::thread::hardware_concurrency();
 	}
 	else if (type == MANAGER_TYPE::CLIENT)
 	{
@@ -66,7 +68,7 @@ void NetworkManager::Connect(const std::string& address)
 			m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
 
 			char buffer[32];
-			for (int i = 0; i < 5; i++)
+			for (int i = 0; i < m_ConnectionTimeLimit; i++)
 			{
 				int received = m_Socket->Receive(buffer, 1);
 				if (received > 0)
@@ -98,8 +100,7 @@ void NetworkManager::Connect(const std::string& address)
 
 void NetworkManager::Tick(float deltaTime)
 {
-	//TODO some variables
-	if (m_Mode == MANAGER_MODE::FREQUENCY)
+	if (m_Mode == MANAGER_MODE::FREQUENCY && !bPendingShutdown)
 	{
 		float per_second = 1 / m_NetFrequency;
 		if (per_second < deltaTime + m_PreviousDelta)
@@ -146,7 +147,10 @@ void NetworkManager::HandleHelloPacket(const TCPSocketPtr& socket)
 			OutputMemoryBitStream stream;
 			stream.WriteBits(PACKET::HELLO, GetRequiredBits<PACKET::MAX>::VALUE);
 			socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
+			m_ConnectionsMutex.lock();
 			m_ServerConnections->insert(std::make_pair(info.name, socket));
+			m_ServerClientsInfo->insert(std::make_pair(info.name, info));
+			m_ConnectionsMutex.unlock();
 			LOG_INFO(Client added to clients - ) << info.name;
 		}
 		else
@@ -228,11 +232,13 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 
 void NetworkManager::Server_HandleClients()
 {
+	m_ConnectionsMutex.lock();
 	for (auto [name, socket] : *m_ServerConnections)
 	{
 		 LOG_INFO(handling client ) << name;
 		 HandlePacket(socket);
 	}
+	m_ConnectionsMutex.unlock();
 }
 
 void NetworkManager::ReceiveData()
@@ -267,12 +273,14 @@ void NetworkManager::SendPacket()
 		stream.Write(m_OutStreamPtr->GetByteLength());
         if (m_Type == MANAGER_TYPE::SERVER)
         {
+			m_ConnectionsMutex.lock();
 		    for (auto& [name, socket] : *m_ServerConnections)
             {
 				socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 				socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
 				LOG_INFO(Send packet to client - ) << name;
 			}
+			m_ConnectionsMutex.unlock();
 		}
 		else if (m_Type == MANAGER_TYPE::CLIENT && bClientApproved && bClientConnected)
         {
@@ -281,6 +289,50 @@ void NetworkManager::SendPacket()
 			LOG_INFO(Send packet to server);
 		}
 	}
+}
+void NetworkManager::AcceptConnections()
+{
+	if (m_Type == MANAGER_TYPE::SERVER)
+    {
+		m_Socket->SetNonBlocking();
+		while (!bPendingShutdown)
+        {
+            SocketAddress addr;
+            auto client = m_Socket->Accept(addr);
+            if (client)
+            {
+				LOG_INFO(Accepting client);
+                for (int wait = 0; wait < m_ConnectionTimeLimit; wait++)
+                {
+					char buffer[128];
+					client->Receive(buffer, 1);
+					PACKET packet = (PACKET)buffer[0];
+					if (packet == HELLO)
+                    {
+					    client->Receive(buffer, sizeof(ManagerInfo));
+						m_InStreamPtr = std::make_unique<InputMemoryBitStream>(buffer, sizeof(ManagerInfo));
+						HandleHelloPacket(client);
+						break;
+					}
+					sleep(1);
+				}
+			}
+		}
+		m_Socket->SetBlocking();
+	}
+}
+
+void NetworkManager::SetConnectionTimeLimit(int newLimit)
+{
+	if (newLimit > 0)
+    {
+        m_ConnectionTimeLimit = newLimit;
+	}
+}
+
+int NetworkManager::GetConnectionTimeLimit() const
+{
+	return m_ConnectionTimeLimit;
 }
 
 //TODO packet data limit

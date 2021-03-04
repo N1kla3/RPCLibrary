@@ -305,18 +305,21 @@ void NetworkManager::AcceptConnections()
                 for (int wait = 0; wait < m_ConnectionTimeLimit; wait++)
                 {
 					char buffer[128];
-					client->Receive(buffer, 1);
-					PACKET packet = (PACKET)buffer[0];
-					if (packet == HELLO)
+					auto received = client->Receive(buffer, 1);
+					if (received > 0)
                     {
-					    client->Receive(buffer, sizeof(ManagerInfo));
-						m_InStreamPtr = std::make_unique<InputMemoryBitStream>(buffer, sizeof(ManagerInfo));
-						HandleHelloPacket(client);
-						break;
+                        PACKET packet = (PACKET)buffer[0];
+                        if (packet == HELLO)
+                        {
+                            client->Receive(buffer, sizeof(ManagerInfo));
+                            m_InStreamPtr = std::make_unique<InputMemoryBitStream>(buffer, sizeof(ManagerInfo));
+                            HandleHelloPacket(client);
+                            break;
+                        }
 					}
-					sleep(1);
-				}
-			}
+                    sleep(1);
+                }
+            }
 		}
 		m_Socket->SetBlocking();
 	}
@@ -333,6 +336,48 @@ void NetworkManager::SetConnectionTimeLimit(int newLimit)
 int NetworkManager::GetConnectionTimeLimit() const
 {
 	return m_ConnectionTimeLimit;
+}
+
+/** after shutdown better not to use object FOR NOW */
+void NetworkManager::Server_Shutdown()
+{
+	if (m_Type == MANAGER_TYPE::SERVER)
+    {
+        bPendingShutdown = true;
+        m_AcceptingThread.join();
+        for (auto& [name, socket] : *m_ServerConnections)
+        {
+            PACKET packet = PACKET::REJECT;
+            socket->Send(&packet, 1);
+        }
+        m_ServerConnections->clear();
+        m_ServerClientsInfo->clear();
+	}
+}
+
+void NetworkManager::Server_DisconnectClient(std::string name)
+{
+	if (m_Type == MANAGER_TYPE::SERVER)
+    {
+        m_ConnectionsMutex.lock();
+
+        auto to_delete_iter = m_ServerConnections->find(name);
+        if (to_delete_iter != m_ServerConnections->end())
+        {
+			PACKET packet = PACKET::REJECT;
+			to_delete_iter->second->Send(&packet, 1);
+            m_ServerConnections->erase(to_delete_iter);
+			LOG_INFO(Disconnecting user ) << name;
+        }
+	    auto to_delete_info = m_ServerClientsInfo->find(name);
+		if (to_delete_info != m_ServerClientsInfo->end())
+        {
+			m_ServerClientsInfo->erase(to_delete_info);
+			LOG_INFO(Deleting user information of ) << name;
+		}
+
+		m_ConnectionsMutex.unlock();
+	}
 }
 
 //TODO packet data limit

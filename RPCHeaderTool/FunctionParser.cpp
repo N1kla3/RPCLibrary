@@ -13,6 +13,7 @@ bool FunctionParser::ParseDeclaration(const std::string& line)
         if (*iter == ' ')
         {
 			ParseDefinition(std::string(iter, line.cend()));
+			break;
 		}
 	}
 	GenerateReadDeclaration();
@@ -51,7 +52,10 @@ std::string FunctionParser::GetRegistrations() const
 void FunctionParser::ParseDefinition(const std::string& string)
 {
 	auto iter = string.cbegin();
-	for (; iter != string.cend() || *iter != ' '; iter++);
+	for (; iter != string.cend(); iter++)
+    {
+		if (*iter != ' ') break;
+	}
 	for (auto scope = iter; scope != string.cend(); scope++)
 	{
 		if (*scope == '(')
@@ -61,11 +65,11 @@ void FunctionParser::ParseDefinition(const std::string& string)
 			break;
 		}
 	}
-	for (auto scope = iter; iter != string.cend(); scope++)
+	for (auto scope = iter; scope != string.cend(); scope++)
     {
         if (*scope == ')')
         {
-			ParseArguments(std::string(iter, scope));
+			ParseArguments(std::string(iter, scope+1));
 		}
 	}
 }
@@ -79,10 +83,10 @@ void FunctionParser::ParseArguments(const std::string& str)
 		if (*right == ',')
         {
 			ParseArg(std::string(iter, right));
-			iter = right + 1;
+			iter = right+1;
 		}
 	}
-	ParseArg(std::string(iter, str.cend()));
+	ParseArg(std::string(iter, str.cend()-1));
 }
 
 void FunctionParser::ParseArg(const std::string& str)
@@ -97,15 +101,16 @@ void FunctionParser::ParseArg(const std::string& str)
 	}
 }
 
-void FunctionParser::GenerateReadDeclaration() const
+void FunctionParser::GenerateReadDeclaration()
 {
-    std::ostringstream stream(m_ReadDeclarations);
+    std::ostringstream stream;
 	stream << "void read_" << name << "(InputMemoryBitStream stream);";
+	m_ReadDeclarations = stream.str();
 }
 
-void FunctionParser::GenerateWriteDeclaration() const
+void FunctionParser::GenerateWriteDeclaration()
 {
-	std::ostringstream stream(m_WriteDeclarations);
+	std::ostringstream stream;
 	stream << "void write_" << name << "(NetworkManager manager,";
     for (auto index = 0; index < m_Args.size() || index < m_ArgsTypes.size(); index++)
     {
@@ -116,11 +121,12 @@ void FunctionParser::GenerateWriteDeclaration() const
 		}
 	}
 	stream << ");";
+	m_WriteDeclarations = stream.str();
 }
 
-void FunctionParser::GenerateReadDefinition() const
+void FunctionParser::GenerateReadDefinition()
 {
-    std::ostringstream stream(m_ReadDeclarations);
+    std::ostringstream stream;
     stream << std::string(m_ReadDeclarations.cbegin(), m_ReadDeclarations.cend()-1) << "{";
 
     for (auto index = 0; index < m_Args.size() || index < m_ArgsTypes.size(); index++)
@@ -138,11 +144,12 @@ void FunctionParser::GenerateReadDefinition() const
 		}
 	}
 	stream << ");}";
+	m_ReadDefinitions = stream.str();
 }
 
-void FunctionParser::GenerateWriteDefinition() const
+void FunctionParser::GenerateWriteDefinition()
 {
-    std::ostringstream stream(m_WriteDeclarations);
+    std::ostringstream stream;
     stream << std::string(m_WriteDeclarations.cbegin(), m_WriteDeclarations.cend()-1) << "{";
 	for (const auto & m_Arg : m_Args)
     {
@@ -158,10 +165,12 @@ void FunctionParser::GenerateWriteDefinition() const
         }
     }
     stream << ");manager.EndFunction();}";
+	m_WriteDefinitions = stream.str();
 }
 
-void FunctionParser::GenerateRegistrations() const
+void FunctionParser::GenerateRegistrations()
 {
-    std::ostringstream stream(m_Registrations);
+    std::ostringstream stream;
 	stream << "RPCManager::RegisterFunction(read_" << name << "," << "\"" << name << "\"" << ");";
+	m_Registrations = stream.str();
 }

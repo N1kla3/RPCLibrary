@@ -91,7 +91,7 @@ void parseToHeader(const string& inFile, const string& headerPath, const string&
         header.close();
     }
 
-	std::ofstream gen_header("headerPath", std::ios_base::app);
+	std::ofstream gen_header(headerPath, std::ios_base::app);
 	if (gen_header.is_open())
     {
 		gen_header << parser.GetReadDeclarations();
@@ -99,7 +99,7 @@ void parseToHeader(const string& inFile, const string& headerPath, const string&
 		gen_header.close();
 	}
 
-	std::ofstream gen_cpp("cppPath", std::ios_base::app);
+	std::ofstream gen_cpp(cppPath, std::ios_base::app);
 	if (gen_cpp.is_open())
     {
 	    gen_cpp << parser.GetReadDefinitions();

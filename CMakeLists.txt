@@ -8,9 +8,6 @@ find_package(Boost REQUIRED COMPONENTS log log_setup REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 add_subdirectory(RPCHeaderTool)
 
-set(GENERATED_HEADER ${PROJECT_SOURCE_DIR}/rpc.generated.h)
-set(GENERATED_CPP ${PROJECT_SOURCE_DIR}/rpc.generated.cpp)
-
 
 set(SOURCE
         RPC.cpp
@@ -29,13 +26,17 @@ set(SOURCE
         NetworkManager.cpp
         NetworkManager.h)
 
-macro(HeaderTool ParseDirectory LibDirectory Headers)
-    add_custom_target(OUTPUT ${GENERATED_HEADER} ${GENERATED_CPP}
-            COMMAND RPCHeaderTool ${ParseDirectory} ${LibDirectory}
-            DEPEND ${Headers})
-endmacro()
+macro(HeaderTool)
 
-add_library(RPClibrary ${SOURCE} ${GENERATED_HEADER} ${GENERATED_CPP})
+    add_custom_command(OUTPUT ${PROJECT_SOURCE_DIR}/RPCLibrary/rpc.generated.h ${PROJECT_SOURCE_DIR}/RPCLibrary/rpc.generated.cpp
+            COMMAND RPCHeaderTool ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/RPCLibrary
+            DEPENDS ${ARGV} RPCHeaderTool
+            COMMENT "generating files"
+            )
+
+endmacro(HeaderTool)
+
+add_library(RPClibrary ${SOURCE})
 target_precompile_headers(RPClibrary PUBLIC RPC.h)
 
 target_link_libraries(RPClibrary Boost::log Boost::log_setup)

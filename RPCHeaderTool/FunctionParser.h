@@ -24,11 +24,11 @@ private:
 	void ParseArg(const std::string& str);
 
 	// Generation utility functions
-	void GenerateReadDeclaration() const;
-	void GenerateWriteDeclaration() const;
-	void GenerateReadDefinition() const;
-	void GenerateWriteDefinition() const;
-	void GenerateRegistrations() const;
+	void GenerateReadDeclaration();
+	void GenerateWriteDeclaration();
+	void GenerateReadDefinition();
+	void GenerateWriteDefinition();
+	void GenerateRegistrations();
 
 	std::string name;
 	std::vector<std::string> m_Args{};

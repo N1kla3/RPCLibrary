@@ -186,11 +186,6 @@ void NetworkManager::SendRejected(const TCPSocketPtr& socket)
 	socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 }
 
-void NetworkManager::SendFunction()
-{
-	//TODO parser first
-}
-
 void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 {
 	PACKET packet;
@@ -281,12 +276,13 @@ void NetworkManager::EndFunction()
 	if (bReadyToWriteFunction)
     {
 		bReadyToWriteFunction = false;
+		bContainSendData = true;
 	}
 }
 
 void NetworkManager::SendPacket()
 {
-    if (bReadyToWritePacket)
+    if (bReadyToWritePacket && bContainSendData)
     {
 		OutputMemoryBitStream stream;
 		stream.WriteBits(PACKET::DATA, GetRequiredBits<PACKET::MAX>::VALUE);

@@ -29,13 +29,13 @@ set(SOURCE
         NetworkManager.cpp
         NetworkManager.h)
 
-macro(HeaderTool ParseDirectory OutputDir Headers)
+macro(HeaderTool ParseDirectory LibDirectory Headers)
     add_custom_target(OUTPUT ${GENERATED_HEADER} ${GENERATED_CPP}
-            COMMAND RPCHeaderTool ${ParseDirectory} ${OutputDir}
+            COMMAND RPCHeaderTool ${ParseDirectory} ${LibDirectory}
             DEPEND ${Headers})
 endmacro()
 
-add_library(RPClibrary ${SOURCE})
+add_library(RPClibrary ${SOURCE} ${GENERATED_HEADER} ${GENERATED_CPP})
 target_precompile_headers(RPClibrary PUBLIC RPC.h)
 
 target_link_libraries(RPClibrary Boost::log Boost::log_setup)

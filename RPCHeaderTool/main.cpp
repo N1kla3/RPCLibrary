@@ -7,6 +7,7 @@
 #include <iostream>
 
 using std::string;
+
 void GenerateHeader(const string& pathToProjectSource, const string& whereToGenerate);
 void parseToHeader(const string& inFile, const string& headerPath, const string& cppPath);
 
@@ -28,8 +29,8 @@ int main(int arg, char** argc)
 
 void GenerateHeader(const string& pathToProjectSource, const string& whereToGenerate)
 {
-	auto header_path = whereToGenerate + "/gen.network.h";
-	auto cpp_path = whereToGenerate + "/gen.network.cpp";
+	auto header_path = whereToGenerate + "/rpc.generated.h";
+	auto cpp_path = whereToGenerate + "/rpc.generated.cpp";
 
 	std::ofstream header(header_path);
 	if (header.is_open())

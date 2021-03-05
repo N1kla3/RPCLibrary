@@ -88,8 +88,6 @@ public:
 
     void SendRejected(const TCPSocketPtr& socket);
 
-    void SendFunction();
-
 	void SendPacket();
 
     /** @brief Check received data per second */
@@ -137,8 +135,6 @@ protected:
 	virtual void Server_HandleClients();
 
     int bContainSendData:1 = 0;
-
-    int bContainReceiveData:1 = 0;
 
     int bClientConnected:1 = 0;
 

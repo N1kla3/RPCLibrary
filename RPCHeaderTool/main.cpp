@@ -45,13 +45,28 @@ void GenerateHeader(const string& pathToProjectSource, const string& whereToGene
 	std::ofstream cpp(cpp_path);
 	if (cpp.is_open())
 	{
-		cpp << "#include\"gen.network.h\"\n";
-		cpp << "#include\"RPCManager\"\n";
-		cpp << "#include\"NetworkManager\"\n";
+		cpp << "#include\"rpc.generated.h\"\n";
+		cpp << "#include\"RPCManager.h\"\n";
+		cpp << "#include\"NetworkManager.h\"\n";
 		cpp.close();
 	}
 	else std::cout << "cant open file\n";
 
+    for (const auto& file : std::filesystem::directory_iterator(pathToProjectSource))
+    {
+		std::ostringstream includes;
+        std::string file_name = file.path().filename().string();
+        if (*(file_name.cend() - 1) == 'h')
+        {
+			includes << "#include" << "\"" << "../" << file_name << "\"\n";
+        }
+		cpp.open(cpp_path, std::ios_base::app);
+		if (cpp.is_open())
+        {
+			cpp << includes.str();
+			cpp.close();
+		}
+    }
 	for (const auto& file : std::filesystem::directory_iterator(pathToProjectSource))
 	{
 		std::string path_file = file.path().string();

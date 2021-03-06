@@ -36,9 +36,9 @@ namespace src = boost::log::sources;
 namespace sinks = boost::log::sinks;
 namespace keywords = boost::log::keywords;
 
-src::severity_logger<logging::trivial::severity_level> lg;
+inline src::severity_logger<logging::trivial::severity_level> lg;
 
-void InitLog()
+inline void InitLog()
 {
     logging::add_file_log(keywords::file_name = "sample%N.log", keywords::rotation_size = 10 * 1024 * 1024,
                           keywords::time_based_rotation = sinks::file::rotation_at_time_point(0, 0, 0),

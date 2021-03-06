@@ -104,14 +104,14 @@ void FunctionParser::ParseArg(const std::string& str)
 void FunctionParser::GenerateReadDeclaration()
 {
     std::ostringstream stream;
-	stream << "void read_" << name << "(InputMemoryBitStream stream);";
+	stream << "void read_" << name << "(InputMemoryBitStream& stream);";
 	m_ReadDeclarations = stream.str();
 }
 
 void FunctionParser::GenerateWriteDeclaration()
 {
 	std::ostringstream stream;
-	stream << "void write_" << name << "(NetworkManager manager,";
+	stream << "void write_" << name << "(class NetworkManager manager,";
     for (auto index = 0; index < m_Args.size() || index < m_ArgsTypes.size(); index++)
     {
 		stream << m_ArgsTypes[index] << " " << m_Args[index];
@@ -153,7 +153,7 @@ void FunctionParser::GenerateWriteDefinition()
     stream << std::string(m_WriteDeclarations.cbegin(), m_WriteDeclarations.cend()-1) << "{";
 	for (const auto & m_Arg : m_Args)
     {
-		stream << "manager.AddDataToPacket(" << m_Arg << ")\n";
+		stream << "manager.AddDataToPacket(" << m_Arg << ");\n";
 	}
 	stream << name << "(";
     for (auto iter = m_Args.cbegin(); iter != m_Args.cend(); iter++)

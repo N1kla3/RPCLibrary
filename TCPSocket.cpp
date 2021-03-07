@@ -51,7 +51,6 @@ std::shared_ptr<TCPSocket> TCPSocket::Accept(SocketAddress& inFromAddress)
     if (newSocket != -1) { return TCPSocketPtr(new TCPSocket(newSocket)); }
     else
     {
-        LOG_ERROR(TCPSocket::Accept);
         return nullptr;
     }
 }
@@ -85,5 +84,5 @@ void TCPSocket::SetNonBlocking()
 
 void TCPSocket::SetBlocking()
 {
-	fcntl(m_Socket, F_SETFL, fcntl(m_Socket, F_GETFL) ^ ~O_NONBLOCK);
+	fcntl(m_Socket, F_SETFL, fcntl(m_Socket, F_GETFL) ^ O_NONBLOCK);
 }

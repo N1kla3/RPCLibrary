@@ -2,12 +2,13 @@
 // Created by nicola on 22/02/2021.
 //
 
-#include "RPC.h"
-#include "Stream.h"
-#include "SocketFactory.h"
-#include <memory>
-#include "Socket.h"
 #include "NetworkManager.h"
+#include "RPC.h"
+#include "Socket.h"
+#include "SocketFactory.h"
+#include "Stream.h"
+#include <libnetlink.h>
+#include <memory>
 
 
 NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
@@ -24,6 +25,8 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 		LOG_INFO(Server at port) << port;
 		m_AcceptingThread = std::thread(&NetworkManager::AcceptConnections, this);
 		LOG_INFO(Maximum threads supported - ) << std::thread::hardware_concurrency();
+		m_ServerConnections = std::make_unique<std::unordered_map<std::string, TCPSocketPtr>>();
+        m_ServerClientsInfo = std::make_unique<std::unordered_map<std::string, ManagerInfo>>();
 	}
 	else if (type == MANAGER_TYPE::CLIENT)
 	{
@@ -51,15 +54,18 @@ MANAGER_MODE NetworkManager::GetManagerMode() const
 }
 
 /** Client-Side only */
-void NetworkManager::Connect(const std::string& address)
+void NetworkManager::Connect(const std::string& address, int port)
 {
 	if (m_Type == MANAGER_TYPE::CLIENT)
 	{
-		if (m_Socket->Connect(*SocketFactory::CreateIPv4FromString(address)) < 0)
+		m_Socket->SetBlocking();
+        SocketAddress addr(port, inet_addr(address.c_str()));
+		if (m_Socket->Connect(addr) < 0)
 		{
-			LOG_ERROR(NetworkManager::Connect ) << address;
+			LOG_ERROR(NetworkManager::Connect ) << address << SocketUtil::GetLastError();
 		}
 		else bClientConnected = true;
+		m_Socket->SetNonBlocking();
 
 		if (bClientConnected)
 		{
@@ -333,6 +339,7 @@ void NetworkManager::AcceptConnections()
                             break;
                         }
 					}
+					LOG_INFO(Thread::Waiting user data seconds - ) << wait;
                     sleep(1);
                 }
             }

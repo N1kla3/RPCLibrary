@@ -20,15 +20,16 @@ public:
 
     inline static void RegisterFunction(RPCWrapFunction func, const std::string& id)
     {
-        if (m_WrappedFunctions.at(id) != nullptr)
+        if (m_WrappedFunctions.find(id) != m_WrappedFunctions.end())
         {
-            LOG_FATAL(id exists);
+            LOG_FATAL(Id exists yet);
+			LOG_FATAL(EXITING...);
             std::exit(-1);
         }
         else
         {
             m_WrappedFunctions[id] = func;
-            LOG_DEBUG(function added to rpc manager);
+            LOG_DEBUG(Function added to rpc manager ) << id;
         }
     }
 
@@ -37,11 +38,11 @@ public:
         if (m_WrappedFunctions.find(id) != m_WrappedFunctions.end())
         {
             m_WrappedFunctions.at(id)(inStream);
-            LOG_DEBUG(execute received function);
+            LOG_DEBUG(Execute received function) << id;
         }
         else
         {
-            LOG_FATAL(function doesnt exists);
+            LOG_FATAL(Function doesnt exists) << id;
         }
     }
 

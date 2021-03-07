@@ -105,7 +105,7 @@ public:
 
 	[[nodiscard]] inline int GetConnectionTimeLimit() const;
 
-    void Connect(const std::string& address);
+	void Connect(const std::string& address, int port);
 
     /** @brief Should be called in while, do nothing if MANUAL mode enabled */
     void Tick(float deltaTime);

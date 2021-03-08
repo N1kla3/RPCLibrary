@@ -23,6 +23,7 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 		SocketAddress addr(INADDR_ANY, port);
 		m_Socket->Bind(addr);
 		LOG_INFO(Server at port) << port;
+		if (m_Socket->Listen() < 0) LOG_FATAL(SERVER CANT LISTEN);
 		m_AcceptingThread = std::thread(&NetworkManager::AcceptConnections, this);
 		LOG_INFO(Maximum threads supported - ) << std::thread::hardware_concurrency();
 		m_ServerConnections = std::make_unique<std::unordered_map<std::string, TCPSocketPtr>>();
@@ -58,39 +59,41 @@ void NetworkManager::Connect(const std::string& address, int port)
 {
 	if (m_Type == MANAGER_TYPE::CLIENT)
 	{
-		m_Socket->SetBlocking();
-        SocketAddress addr(port, inet_addr(address.c_str()));
+		if (bClientConnected) return;
+        SocketAddress addr(inet_addr(address.c_str()), port);
 		if (m_Socket->Connect(addr) < 0)
 		{
 			LOG_ERROR(NetworkManager::Connect ) << address << SocketUtil::GetLastError();
 		}
 		else bClientConnected = true;
-		m_Socket->SetNonBlocking();
 
 		if (bClientConnected)
 		{
 			m_OutStreamPtr = std::make_unique<OutputMemoryBitStream>();
 			SendHello();
 			m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
+			LOG_INFO(Send info);
 
 			char buffer[32];
 			for (int i = 0; i < m_ConnectionTimeLimit; i++)
 			{
+				LOG_INFO(Wait result);
 				int received = m_Socket->Receive(buffer, 1);
 				if (received > 0)
 				{
-					m_InStreamPtr = std::make_unique<InputMemoryBitStream>(buffer, GetRequiredBits<PACKET::MAX>::VALUE);
-					PACKET packet;
-					m_InStreamPtr->Read(packet);
+					LOG_INFO(Received answer);
+                    PACKET packet = (PACKET)buffer[0];
 					if (packet == HELLO)
 					{
 						LOG_INFO(Connected to Server);
 						bClientApproved = true;
+						return;
 					}
 					else if (packet == REJECT)
 					{
 						LOG_INFO(Server reject you);
 						bClientConnected = false;
+						return;
 					}
 				}
 				else
@@ -150,9 +153,8 @@ void NetworkManager::HandleHelloPacket(const TCPSocketPtr& socket)
 
 		if (validation)
 		{
-			OutputMemoryBitStream stream;
-			stream.WriteBits(PACKET::HELLO, GetRequiredBits<PACKET::MAX>::VALUE);
-			socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
+			PACKET packet = PACKET::HELLO;
+			socket->Send(&packet, 1);
 			m_ConnectionsMutex.lock();
 			m_ServerConnections->insert(std::make_pair(info.name, socket));
 			m_ServerClientsInfo->insert(std::make_pair(info.name, info));
@@ -316,7 +318,6 @@ void NetworkManager::AcceptConnections()
 {
 	if (m_Type == MANAGER_TYPE::SERVER)
     {
-		m_Socket->SetNonBlocking();
 		while (!bPendingShutdown)
         {
             SocketAddress addr;
@@ -344,7 +345,6 @@ void NetworkManager::AcceptConnections()
                 }
             }
 		}
-		m_Socket->SetBlocking();
 	}
 }
 

@@ -71,7 +71,6 @@ int32_t TCPSocket::Receive(void* inBuffer, size_t inLen)
     int bytesReceivedCount = recv(m_Socket, static_cast<char*>(inBuffer), inLen, 0);
     if (bytesReceivedCount < 0)
     {
-        LOG_ERROR(TCPSocket::Receive);
         return -SocketUtil::GetLastError();
     }
     return bytesReceivedCount;

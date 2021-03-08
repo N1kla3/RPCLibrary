@@ -99,11 +99,15 @@ public:
 
 	inline void SetConnectionTimeLimit(int newLimit);
 
+	void SetManagerInfo(ManagerInfo&& info);
+
     [[nodiscard]] MANAGER_MODE GetManagerMode() const;
 
     [[nodiscard]] MANAGER_TYPE GetManagerType() const noexcept;
 
 	[[nodiscard]] inline int GetConnectionTimeLimit() const;
+
+	[[nodiscard]] bool IsConnected() const;
 
 	void Connect(const std::string& address, int port);
 
@@ -128,7 +132,7 @@ public:
 protected:
 
 	// Security functions
-	[[nodiscard]] virtual bool ValidateLowLevel(const ManagerInfo& info) const {return true;};
+	[[nodiscard]] virtual bool ValidateLowLevel(const ManagerInfo& info) const {return !info.name.empty();};
 	[[nodiscard]] virtual bool ValidateCommonLevel(const ManagerInfo& info) const {return true;};
 	[[nodiscard]] virtual bool ValidateHighLevel(const ManagerInfo& info) const {return true;};
 
@@ -143,6 +147,8 @@ protected:
 	int bReadyToWriteFunction:1 = 0;
 
     int bReadyToWritePacket:1 = 0;
+
+	int bInfoExists:1 = 0;
 
 	std::atomic<bool> bPendingShutdown = false;
 

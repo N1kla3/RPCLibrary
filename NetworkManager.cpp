@@ -36,7 +36,11 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 }
 
 NetworkManager::~NetworkManager()
-= default;
+{
+	Server_Shutdown();
+	LOG_INFO(DESTORYING NETWORK MANAGER);
+}
+
 
 
 void NetworkManager::SetNetFrequency(float frequency)
@@ -69,9 +73,10 @@ void NetworkManager::Connect(const std::string& address, int port)
 
 		if (bClientConnected)
 		{
+			auto packet = PACKET::HELLO;
+			m_Socket->Send(&packet, 1);
 			m_OutStreamPtr = std::make_unique<OutputMemoryBitStream>();
 			SendHello();
-			m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
 			LOG_INFO(Send info);
 
 			char buffer[32];
@@ -82,7 +87,7 @@ void NetworkManager::Connect(const std::string& address, int port)
 				if (received > 0)
 				{
 					LOG_INFO(Received answer);
-                    PACKET packet = (PACKET)buffer[0];
+                    packet = (PACKET)buffer[0];
 					if (packet == HELLO)
 					{
 						LOG_INFO(Connected to Server);
@@ -177,13 +182,15 @@ void NetworkManager::HandleFunctionPacket(InputMemoryBitStream& stream)
 	RPCManager::Proccess(function_id, stream);
 }
 
-/** Write to member streams */
+/** CLIENT ONLY Write to member streams */
 void NetworkManager::SendHello()
 {
-	m_OutStreamPtr->WriteBits(PACKET::HELLO, GetRequiredBits<PACKET::MAX>::VALUE);
 	if (m_Type == MANAGER_TYPE::CLIENT)
 	{
 		m_Info.Write(*m_OutStreamPtr);
+		uint32_t len = m_OutStreamPtr->GetByteLength();
+		m_Socket->Send(&len, sizeof(uint32_t));
+		m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
 	}
 }
 
@@ -197,7 +204,9 @@ void NetworkManager::SendRejected(const TCPSocketPtr& socket)
 void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 {
 	PACKET packet;
-	int received = socket->Receive(&packet, 1);
+	char buf[1];
+	int received = socket->Receive(&buf, 1);
+	packet = static_cast<PACKET>(buf[0]);
 	if (received > 0)
 	{
 		if (packet == PACKET::DATA)
@@ -216,11 +225,11 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 					{
 						stream.ReadBits(&packet, GetRequiredBits<PACKET::MAX>::VALUE);
 						if (packet == PACKET::FUNCTION)
-						{//TODO check parser
+						{
 							HandleFunctionPacket(stream);
-						}//TODO accept of clients on server
+						}
 					}
-				}//TODO send with propriate bytes , question
+				}
 			}
 			socket->SetNonBlocking();
 		}
@@ -238,7 +247,8 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 			received = socket->Receive(buffer, sizeof(uint32_t));
 			if (received > 0)
             {
-				uint32_t len = buffer[0];
+				uint32_t len = *reinterpret_cast<uint32_t *>(&buffer[0]);
+				LOG_DEBUG(name len) << len;
 			    received = socket->Receive(buffer, len);
 				if (received > 0)
                 {
@@ -334,13 +344,15 @@ void NetworkManager::AcceptConnections()
                         PACKET packet = (PACKET)buffer[0];
                         if (packet == HELLO)
                         {
-                            client->Receive(buffer, sizeof(ManagerInfo));
-                            m_InStreamPtr = std::make_unique<InputMemoryBitStream>(buffer, sizeof(ManagerInfo));
+                            client->Receive(buffer, sizeof(uint32_t));
+                            uint32_t len = *reinterpret_cast<uint32_t *>(&buffer[0]);
+							client->Receive(buffer, len);
+                            m_InStreamPtr = std::make_unique<InputMemoryBitStream>(buffer, len);
                             HandleHelloPacket(client);
                             break;
                         }
-					}
-					LOG_INFO(Thread::Waiting user data seconds - ) << wait;
+					}else LOG_INFO(Thread::Waiting data);
+					LOG_DEBUG(Received but not all);
                     sleep(1);
                 }
             }
@@ -364,6 +376,7 @@ int NetworkManager::GetConnectionTimeLimit() const
 /** after shutdown better not to use object FOR NOW */
 void NetworkManager::Server_Shutdown()
 {
+	if (bPendingShutdown) return;
 	if (m_Type == MANAGER_TYPE::SERVER)
     {
         bPendingShutdown = true;
@@ -383,7 +396,7 @@ void NetworkManager::Server_DisconnectClient(std::string name)
 	if (m_Type == MANAGER_TYPE::SERVER)
     {
         m_ConnectionsMutex.lock();
-
+        LOG_INFO(Start disconnecting);
         auto to_delete_iter = m_ServerConnections->find(name);
         if (to_delete_iter != m_ServerConnections->end())
         {
@@ -413,6 +426,16 @@ void NetworkManager::Client_Disconnect()
 		stream.Write(m_Info.name);
 		m_Socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 	}
+}
+void NetworkManager::SetManagerInfo(ManagerInfo&& info)
+{
+	if (bInfoExists) return;
+	m_Info = info;
+	bInfoExists = true;
+}
+bool NetworkManager::IsConnected() const
+{
+	return bClientConnected && bClientApproved;
 }
 
 //TODO packet data limit

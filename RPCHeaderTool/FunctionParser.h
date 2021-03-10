@@ -23,6 +23,11 @@ private:
 	void ParseArguments(const std::string& str);
 	void ParseArg(const std::string& str);
 
+	// Util functions for minor modification
+	std::string RemoveModifiers(std::string str);
+	std::string&& RemoveConst(std::string&& argument);
+	std::string&& RemoveRef(std::string&& argument);
+
 	// Generation utility functions
 	void GenerateReadDeclaration();
 	void GenerateWriteDeclaration();

@@ -87,7 +87,6 @@ void GenerateHeader(const string& pathToProjectSource, const string& whereToGene
 
 void parseToHeader(const string& inFile, const string& headerPath, const string& cppPath)
 {
-	FunctionParser parser;
 	std::ifstream header(inFile);
 	if (header.is_open())
     {
@@ -99,28 +98,29 @@ void parseToHeader(const string& inFile, const string& headerPath, const string&
 			string_line >> res;
 			if (res == "RPCfunction()")
             {
+				FunctionParser parser;
                 std::getline(header, str);
 				parser.ParseDeclaration(str);
+
+                std::ofstream gen_header(headerPath, std::ios_base::app);
+                if (gen_header.is_open())
+                {
+                    gen_header << parser.GetReadDeclarations();
+                    gen_header << parser.GetWriteDeclarations();
+                    gen_header.close();
+                }
+
+                std::ofstream gen_cpp(cppPath, std::ios_base::app);
+                if (gen_cpp.is_open())
+                {
+                    gen_cpp << parser.GetReadDefinitions();
+                    gen_cpp << parser.GetWriteDefinitions();
+
+                    generations.append(parser.GetRegistrations());
+                }
 			}
 		}
         header.close();
     }
-
-	std::ofstream gen_header(headerPath, std::ios_base::app);
-	if (gen_header.is_open())
-    {
-		gen_header << parser.GetReadDeclarations();
-		gen_header << parser.GetWriteDeclarations();
-		gen_header.close();
-	}
-
-	std::ofstream gen_cpp(cppPath, std::ios_base::app);
-	if (gen_cpp.is_open())
-    {
-	    gen_cpp << parser.GetReadDefinitions();
-		gen_cpp << parser.GetWriteDefinitions();
-
-        generations.append(parser.GetRegistrations());
-	}
 }
 

@@ -97,6 +97,7 @@ void FunctionParser::ParseArg(const std::string& str)
         {
 			m_ArgsTypes.emplace_back(str.cbegin(), iter.base());
             m_Args.emplace_back(iter.base(), str.cend());
+			break;
 		}
 	}
 }
@@ -111,7 +112,7 @@ void FunctionParser::GenerateReadDeclaration()
 void FunctionParser::GenerateWriteDeclaration()
 {
 	std::ostringstream stream;
-	stream << "void write_" << name << "(class NetworkManager manager,";
+	stream << "void write_" << name << "(class NetworkManager& manager,";
     for (auto index = 0; index < m_Args.size() || index < m_ArgsTypes.size(); index++)
     {
 		stream << m_ArgsTypes[index] << " " << m_Args[index];
@@ -131,7 +132,7 @@ void FunctionParser::GenerateReadDefinition()
 
     for (auto index = 0; index < m_Args.size() || index < m_ArgsTypes.size(); index++)
     {
-        stream << m_ArgsTypes[index] << " " << m_Args[index] << "{};";
+        stream << RemoveModifiers(m_ArgsTypes[index]) << " " << m_Args[index] << "{};";
         stream << "stream.Read(" << m_Args[index] << ");\n";
     }
 	stream << name << "(";
@@ -155,16 +156,8 @@ void FunctionParser::GenerateWriteDefinition()
     {
 		stream << "manager.AddDataToPacket(" << m_Arg << ");\n";
 	}
-	stream << name << "(";
-    for (auto iter = m_Args.cbegin(); iter != m_Args.cend(); iter++)
-    {
-        stream << *iter;
-        if (iter != m_Args.cend()-1)
-        {
-            stream << ",";
-        }
-    }
-    stream << ");manager.EndFunction();}";
+
+    stream << "manager.EndFunction();}";
 	m_WriteDefinitions = stream.str();
 }
 
@@ -173,4 +166,31 @@ void FunctionParser::GenerateRegistrations()
     std::ostringstream stream;
 	stream << "RPCManager::RegisterFunction(read_" << name << "," << "\"" << name << "\"" << ");";
 	m_Registrations = stream.str();
+}
+
+/** paste argument type here */
+std::string&& FunctionParser::RemoveConst(std::string&& argument)
+{
+	auto begin = argument.find("const");
+	if (begin != std::string::npos)
+    {
+		argument.erase(begin, begin+5);
+	}
+	return std::move(argument);
+}
+
+std::string&& FunctionParser::RemoveRef(std::string&& argument)
+{
+	auto found = argument.find('&');
+	while (found != std::string::npos)
+    {
+		argument.erase(found);
+		found = argument.find('&');
+	}
+	return std::move(argument);
+}
+
+std::string FunctionParser::RemoveModifiers(std::string str)
+{
+	return RemoveConst(RemoveRef(std::move(str)));
 }

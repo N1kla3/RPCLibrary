@@ -152,6 +152,7 @@ void FunctionParser::GenerateWriteDefinition()
 {
     std::ostringstream stream;
     stream << std::string(m_WriteDeclarations.cbegin(), m_WriteDeclarations.cend()-1) << "{";
+	stream << "manager.AddDataToPacket(\"" << name << "\");";
 	for (const auto & m_Arg : m_Args)
     {
 		stream << "manager.AddDataToPacket(" << m_Arg << ");\n";

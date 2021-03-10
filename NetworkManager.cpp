@@ -206,14 +206,16 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 	PACKET packet;
 	char buf[1];
 	int received = socket->Receive(&buf, 1);
-	packet = static_cast<PACKET>(buf[0]);
 	if (received > 0)
 	{
+        packet = (PACKET)buf[0];
+        LOG_INFO(Prepare packet receive-) << packet;
 		if (packet == PACKET::DATA)
 		{
+			LOG_INFO(Wait packet);
 			socket->SetBlocking();
 			uint32_t data_len = 0;
-			received = socket->Receive(&data_len, sizeof(data_len));
+			received = socket->Receive(&data_len, sizeof(uint32_t));
 			if (received > 0)
 			{
 				char buffer[2048];
@@ -302,15 +304,19 @@ void NetworkManager::SendPacket()
 {
     if (bReadyToWritePacket && bContainSendData)
     {
-		OutputMemoryBitStream stream;
-		stream.WriteBits(PACKET::DATA, GetRequiredBits<PACKET::MAX>::VALUE);
-		stream.Write(m_OutStreamPtr->GetByteLength());
+		//OutputMemoryBitStream stream;
+		//stream.WriteBits(PACKET::DATA, GetRequiredBits<PACKET::MAX>::VALUE);
+		//stream.Write(m_OutStreamPtr->GetByteLength());
         if (m_Type == MANAGER_TYPE::SERVER)
         {
 			m_ConnectionsMutex.lock();
 		    for (auto& [name, socket] : *m_ServerConnections)
             {
-				socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
+				//socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
+				PACKET packet = PACKET::DATA;
+				socket->Send(&packet, 1);
+				uint32_t len = m_OutStreamPtr->GetByteLength();
+				socket->Send(&len, sizeof(uint32_t));
 				socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
 				LOG_INFO(Send packet to client - ) << name;
 			}
@@ -318,7 +324,7 @@ void NetworkManager::SendPacket()
 		}
 		else if (m_Type == MANAGER_TYPE::CLIENT && bClientApproved && bClientConnected)
         {
-			m_Socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
+			//m_Socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 			m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
 			LOG_INFO(Send packet to server);
 		}

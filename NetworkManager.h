@@ -68,11 +68,12 @@ public:
 		if (!bReadyToWriteFunction)
         {
             m_OutStreamPtr->WriteBits(PACKET::FUNCTION, GetRequiredBits<PACKET::MAX>::VALUE);
-			bReadyToWriteFunction = false;
+			bReadyToWriteFunction = true;
 		}
-		if (bReadyToWritePacket)
+		if (bReadyToWritePacket && bReadyToWriteFunction)
         {
 			m_OutStreamPtr->Write(value);
+			LOG_INFO(writing value to packet);
 		}
     }
 

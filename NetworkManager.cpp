@@ -22,23 +22,23 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 	{
 		SocketAddress addr(INADDR_ANY, port);
 		m_Socket->Bind(addr);
-		LOG_INFO(Server at port) << port;
-		if (m_Socket->Listen() < 0) LOG_FATAL(SERVER CANT LISTEN);
+		LOG_INFO("Server at port") << port;
+		if (m_Socket->Listen() < 0) LOG_FATAL("SERVER CANT LISTEN");
 		m_AcceptingThread = std::thread(&NetworkManager::AcceptConnections, this);
-		LOG_INFO(Maximum threads supported - ) << std::thread::hardware_concurrency();
+		LOG_INFO("Maximum threads supported - ") << std::thread::hardware_concurrency();
 		m_ServerConnections = std::make_unique<std::unordered_map<std::string, TCPSocketPtr>>();
         m_ServerClientsInfo = std::make_unique<std::unordered_map<std::string, ManagerInfo>>();
 	}
 	else if (type == MANAGER_TYPE::CLIENT)
 	{
-		LOG_INFO(Client init);
+		LOG_INFO("Client init");
 	}
 }
 
 NetworkManager::~NetworkManager()
 {
 	Server_Shutdown();
-	LOG_INFO(DESTORYING NETWORK MANAGER);
+	LOG_INFO("DESTORYING NETWORK MANAGER");
 }
 
 
@@ -67,7 +67,7 @@ void NetworkManager::Connect(const std::string& address, int port)
         SocketAddress addr(inet_addr(address.c_str()), port);
 		if (m_Socket->Connect(addr) < 0)
 		{
-			LOG_ERROR(NetworkManager::Connect ) << address << SocketUtil::GetLastError();
+			LOG_ERROR("NetworkManager::Connect ") << address << SocketUtil::GetLastError();
 		}
 		else bClientConnected = true;
 
@@ -77,39 +77,39 @@ void NetworkManager::Connect(const std::string& address, int port)
 			m_Socket->Send(&packet, 1);
 			m_OutStreamPtr = std::make_unique<OutputMemoryBitStream>();
 			SendHello();
-			LOG_INFO(Send info);
+			LOG_INFO("Send info");
 
 			char buffer[32];
 			for (int i = 0; i < m_ConnectionTimeLimit; i++)
 			{
-				LOG_INFO(Wait result);
+				LOG_INFO("Wait result");
 				int received = m_Socket->Receive(buffer, 1);
 				if (received > 0)
 				{
-					LOG_INFO(Received answer);
+					LOG_INFO("Received answer");
                     packet = (PACKET)buffer[0];
 					if (packet == HELLO)
 					{
-						LOG_INFO(Connected to Server);
+						LOG_INFO("Connected to Server");
 						bClientApproved = true;
 						return;
 					}
 					else if (packet == REJECT)
 					{
-						LOG_INFO(Server reject you);
+						LOG_INFO("Server reject you");
 						bClientConnected = false;
 						return;
 					}
 				}
 				else
 				{
-					LOG_INFO(wait responce - ) << i;
+					LOG_INFO("wait responce - ") << i;
 					sleep(1);
 				}
 			}
 		}
 	}
-	else LOG_WARNING(Connect can only be used in client);
+	else LOG_WARNING("Connect can only be used in client");
 }
 
 void NetworkManager::Tick(float deltaTime)
@@ -164,11 +164,11 @@ void NetworkManager::HandleHelloPacket(const TCPSocketPtr& socket)
 			m_ServerConnections->insert(std::make_pair(info.name, socket));
 			m_ServerClientsInfo->insert(std::make_pair(info.name, info));
 			m_ConnectionsMutex.unlock();
-			LOG_INFO(Client added to clients - ) << info.name;
+			LOG_INFO("Client added to clients - ") << info.name;
 		}
 		else
 		{
-			LOG_WARNING(Client rejected level validation ) << info.name;
+			LOG_WARNING("Client rejected level validation ") << info.name;
 			SendRejected(socket);
 		}
 	}
@@ -209,11 +209,11 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 	if (received > 0)
 	{
         packet = (PACKET)buf[0];
-        LOG_INFO(Prepare packet receive-) << packet;
+        LOG_INFO("Prepare packet receive-") << packet;
 		if (packet == PACKET::DATA)
 		{
-			LOG_INFO(Wait packet);
-			socket->SetBlocking();
+			LOG_INFO("Wait packet");
+			//TODO make non blocking
 			uint32_t data_len = 0;
 			received = socket->Receive(&data_len, sizeof(uint32_t));
 			if (received > 0)
@@ -225,6 +225,7 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 					InputMemoryBitStream stream(buffer, data_len);
 					while (stream.GetRemainingBitCount() > 0)
 					{
+						LOG_DEBUG("Reading packet buffer") << data_len;
 						stream.ReadBits(&packet, GetRequiredBits<PACKET::MAX>::VALUE);
 						if (packet == PACKET::FUNCTION)
 						{
@@ -233,28 +234,27 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 					}
 				}
 			}
-			socket->SetNonBlocking();
 		}
 		else if (packet == PACKET::REJECT && m_Type == MANAGER_TYPE::CLIENT)
 		{
 			bClientConnected = false;
 			bClientApproved = false;
-			LOG_WARNING(you have been disconnected);
+			LOG_WARNING("you have been disconnected");
 		}
 		else if (packet == PACKET::REJECT && m_Type == MANAGER_TYPE::SERVER)
         {
-			LOG_INFO(receiving disconnect information);
+			LOG_INFO("receiving disconnect information");
 			socket->SetBlocking();
 			char buffer[512];
 			received = socket->Receive(buffer, sizeof(uint32_t));
 			if (received > 0)
             {
 				uint32_t len = *reinterpret_cast<uint32_t *>(&buffer[0]);
-				LOG_DEBUG(name len) << len;
+				LOG_DEBUG("name len ") << len;
 			    received = socket->Receive(buffer, len);
 				if (received > 0)
                 {
-                    InputMemoryBitStream stream(buffer, len);
+                    InputMemoryBitStream stream(buffer, len << 3);
                     std::string name;
                     stream.Read(name);
                     Server_DisconnectClient(name);
@@ -270,7 +270,7 @@ void NetworkManager::Server_HandleClients()
 	m_ConnectionsMutex.lock();
 	for (auto [name, socket] : *m_ServerConnections)
 	{
-		 LOG_INFO(handling client ) << name;
+		 LOG_INFO("handling client ") << name;
 		 HandlePacket(socket);
 	}
 	m_ConnectionsMutex.unlock();
@@ -304,30 +304,32 @@ void NetworkManager::SendPacket()
 {
     if (bReadyToWritePacket && bContainSendData)
     {
-		//OutputMemoryBitStream stream;
-		//stream.WriteBits(PACKET::DATA, GetRequiredBits<PACKET::MAX>::VALUE);
-		//stream.Write(m_OutStreamPtr->GetByteLength());
         if (m_Type == MANAGER_TYPE::SERVER)
         {
 			m_ConnectionsMutex.lock();
 		    for (auto& [name, socket] : *m_ServerConnections)
             {
-				//socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 				PACKET packet = PACKET::DATA;
 				socket->Send(&packet, 1);
-				uint32_t len = m_OutStreamPtr->GetByteLength();
+				uint32_t len = m_OutStreamPtr->GetBitLength();
 				socket->Send(&len, sizeof(uint32_t));
 				socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
-				LOG_INFO(Send packet to client - ) << name;
+				LOG_INFO("Send packet to client - ") << name << (m_OutStreamPtr->GetBitLength());
 			}
 			m_ConnectionsMutex.unlock();
 		}
 		else if (m_Type == MANAGER_TYPE::CLIENT && bClientApproved && bClientConnected)
         {
-			//m_Socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
+            PACKET packet = PACKET::DATA;
+            m_Socket->Send(&packet, 1);
+            uint32_t len = m_OutStreamPtr->GetBitLength();
+            m_Socket->Send(&len, sizeof(uint32_t));
 			m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
-			LOG_INFO(Send packet to server);
+			LOG_INFO("Send packet to server");
 		}
+		bContainSendData = false;
+		bReadyToWriteFunction = false;
+		bReadyToWritePacket = false;
 	}
 }
 void NetworkManager::AcceptConnections()
@@ -340,7 +342,7 @@ void NetworkManager::AcceptConnections()
             auto client = m_Socket->Accept(addr);
             if (client)
             {
-				LOG_INFO(Accepting client);
+				LOG_INFO("Accepting client");
                 for (int wait = 0; wait < m_ConnectionTimeLimit; wait++)
                 {
 					char buffer[128];
@@ -357,8 +359,10 @@ void NetworkManager::AcceptConnections()
                             HandleHelloPacket(client);
                             break;
                         }
-					}else LOG_INFO(Thread::Waiting data);
-					LOG_DEBUG(Received but not all);
+						else LOG_DEBUG("Hello received");
+					}
+					else LOG_INFO("Thread::Waiting data");
+					LOG_DEBUG("Received but not all");
                     sleep(1);
                 }
             }
@@ -402,20 +406,20 @@ void NetworkManager::Server_DisconnectClient(std::string name)
 	if (m_Type == MANAGER_TYPE::SERVER)
     {
         m_ConnectionsMutex.lock();
-        LOG_INFO(Start disconnecting);
+        LOG_INFO("Start disconnecting");
         auto to_delete_iter = m_ServerConnections->find(name);
         if (to_delete_iter != m_ServerConnections->end())
         {
 			PACKET packet = PACKET::REJECT;
 			to_delete_iter->second->Send(&packet, 1);
             m_ServerConnections->erase(to_delete_iter);
-			LOG_INFO(Disconnecting user ) << name;
+			LOG_INFO("Disconnecting user ") << name;
         }
 	    auto to_delete_info = m_ServerClientsInfo->find(name);
 		if (to_delete_info != m_ServerClientsInfo->end())
         {
 			m_ServerClientsInfo->erase(to_delete_info);
-			LOG_INFO(Deleting user information of ) << name;
+			LOG_INFO("Deleting user information of ") << name;
 		}
 
 		m_ConnectionsMutex.unlock();

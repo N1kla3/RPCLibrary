@@ -22,14 +22,14 @@ public:
     {
         if (m_WrappedFunctions.find(id) != m_WrappedFunctions.end())
         {
-            LOG_FATAL(Id exists yet);
-			LOG_FATAL(EXITING...);
+            LOG_FATAL("Id exists yet");
+			LOG_FATAL("EXITING...");
             std::exit(-1);
         }
         else
         {
             m_WrappedFunctions[id] = func;
-            LOG_DEBUG(Function added to rpc manager ) << id;
+            LOG_DEBUG("Function added to rpc manager ") << id;
         }
     }
 
@@ -37,12 +37,12 @@ public:
     {
         if (m_WrappedFunctions.find(id) != m_WrappedFunctions.end())
         {
+            LOG_DEBUG("Execute received function ") << id;
             m_WrappedFunctions.at(id)(inStream);
-            LOG_DEBUG(Execute received function) << id;
         }
         else
         {
-            LOG_FATAL(Function doesnt exists) << id;
+            LOG_FATAL("Function doesnt exists") << id;
         }
     }
 

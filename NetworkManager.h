@@ -58,8 +58,9 @@ public:
     virtual ~NetworkManager();
 
     template<typename T>
-    void AddDataToPacket(T value)
+    void AddDataToPacket(T&& value)
     {
+		if (m_ServerConnections->empty()) return;
         if (!bReadyToWritePacket)
         {
 		    bReadyToWritePacket = true;
@@ -72,8 +73,8 @@ public:
 		}
 		if (bReadyToWritePacket && bReadyToWriteFunction)
         {
-			m_OutStreamPtr->Write(value);
-			LOG_INFO(writing value to packet);
+			m_OutStreamPtr->Write(std::forward<T>(value));
+			LOG_INFO("writing value to packet");
 		}
     }
 

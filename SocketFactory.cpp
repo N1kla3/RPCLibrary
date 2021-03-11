@@ -29,7 +29,7 @@ SocketAddressPtr SocketFactory::CreateIPv4FromString(const std::string& inString
     int error = getaddrinfo(host.c_str(), service.c_str(), &hint, &result);
     if (error != 0 && result != nullptr)
     {
-        LOG_WARNING(SocketAddressFactory::CreateIPv4FromString);
+        LOG_WARNING("SocketAddressFactory::CreateIPv4FromString");
         return nullptr;
     }
 

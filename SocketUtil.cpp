@@ -18,7 +18,7 @@ TCPSocketPtr SocketUtil::CreateTCPSocket(SocketAddressFamily inFamily)
     }
     else
     {
-        LOG_ERROR(cant create socket);
+        LOG_ERROR("cant create socket");
     }
     return TCPSocketPtr();
 }

@@ -157,7 +157,7 @@ public:
     }
 
     template<typename tKey, typename tValue>
-    requires primitive<tKey>&& primitive<tValue>
+    requires primitive<tKey> && primitive<tValue>
     void Read(std::unordered_map<tKey, tValue>& map)
     {
         size_t size;

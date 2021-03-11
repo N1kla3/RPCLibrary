@@ -70,12 +70,12 @@ struct GetRequiredBits {
 };
 
 
-#define LOG_TRACE(text) BOOST_LOG_SEV(lg, logging::trivial::trace) << #text
-#define LOG_DEBUG(text) BOOST_LOG_SEV(lg, logging::trivial::debug) << #text
-#define LOG_INFO(text)  BOOST_LOG_SEV(lg, logging::trivial::info) << #text
-#define LOG_WARNING(text) BOOST_LOG_SEV(lg, logging::trivial::warning) << #text
-#define LOG_ERROR(text) BOOST_LOG_SEV(lg, logging::trivial::error) << #text
-#define LOG_FATAL(text) BOOST_LOG_SEV(lg, logging::trivial::fatal) << #text
+#define LOG_TRACE(text) BOOST_LOG_SEV(lg, logging::trivial::trace) << text
+#define LOG_DEBUG(text) BOOST_LOG_SEV(lg, logging::trivial::debug) << text
+#define LOG_INFO(text)  BOOST_LOG_SEV(lg, logging::trivial::info) << text
+#define LOG_WARNING(text) BOOST_LOG_SEV(lg, logging::trivial::warning) << text
+#define LOG_ERROR(text) BOOST_LOG_SEV(lg, logging::trivial::error) << text
+#define LOG_FATAL(text) BOOST_LOG_SEV(lg, logging::trivial::fatal) << text
 
 // My headers
 //////////////////////////////////////////////////////////////////////////////////////////

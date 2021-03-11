@@ -10,6 +10,37 @@
 #include <libnetlink.h>
 #include <memory>
 
+/** Utility structure for non blocking packet receive */
+struct ReceivePacketInfo
+{
+    char* buffer = nullptr;
+    uint16_t current = 0;
+    uint16_t want_to_receive = 0;
+    uint16_t required_bits = 0;
+	bool is_initialized = false;
+
+    void Init(uint16_t wantToReceive, uint16_t requiredBits)
+    {
+		buffer = new char[wantToReceive];
+        want_to_receive = wantToReceive;
+		required_bits = requiredBits;
+		is_initialized = true;
+    }
+    bool IsInit()
+    {
+        return is_initialized;
+    }
+    void Destroy()
+    {
+        delete[] buffer;
+        current = 0;
+		is_initialized = false;
+    }
+	~ReceivePacketInfo()
+    {
+		if (is_initialized) delete buffer;
+	}
+};
 
 NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 		:
@@ -28,9 +59,11 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 		LOG_INFO("Maximum threads supported - ") << std::thread::hardware_concurrency();
 		m_ServerConnections = std::make_unique<std::unordered_map<std::string, TCPSocketPtr>>();
         m_ServerClientsInfo = std::make_unique<std::unordered_map<std::string, ManagerInfo>>();
+		m_ServerPacketConditions = std::make_unique<std::unordered_map<std::string, ReceivePacketInfo>>();
 	}
 	else if (type == MANAGER_TYPE::CLIENT)
 	{
+		m_ClientPacketConditionPtr = std::make_unique<ReceivePacketInfo>();
 		LOG_INFO("Client init");
 	}
 }
@@ -188,7 +221,7 @@ void NetworkManager::SendHello()
 	if (m_Type == MANAGER_TYPE::CLIENT)
 	{
 		m_Info.Write(*m_OutStreamPtr);
-		uint32_t len = m_OutStreamPtr->GetByteLength();
+		uint32_t len = m_OutStreamPtr->GetBitLength();
 		m_Socket->Send(&len, sizeof(uint32_t));
 		m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
 	}
@@ -201,8 +234,12 @@ void NetworkManager::SendRejected(const TCPSocketPtr& socket)
 	socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 }
 
-void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
+void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string& name)
 {
+	if (bReceivedNotAll)
+    {
+		//TODO REFORGE IT ALLLLLLLLL
+	}
 	PACKET packet;
 	char buf[1];
 	int received = socket->Receive(&buf, 1);
@@ -268,10 +305,10 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket)
 void NetworkManager::Server_HandleClients()
 {
 	m_ConnectionsMutex.lock();
-	for (auto [name, socket] : *m_ServerConnections)
+	for (auto& [name, socket] : *m_ServerConnections)
 	{
 		 LOG_INFO("handling client ") << name;
-		 HandlePacket(socket);
+		 HandlePacket(socket, name);
 	}
 	m_ConnectionsMutex.unlock();
 }
@@ -282,7 +319,7 @@ void NetworkManager::ReceiveData()
 	{
 		if (m_Type == MANAGER_TYPE::CLIENT)
         {
-            HandlePacket(m_Socket);
+			HandlePacket(m_Socket);
 		}
 		else if (m_Type == MANAGER_TYPE::SERVER)
         {
@@ -437,18 +474,67 @@ void NetworkManager::Client_Disconnect()
 		m_Socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 	}
 }
+
 void NetworkManager::SetManagerInfo(ManagerInfo&& info)
 {
 	if (bInfoExists) return;
 	m_Info = info;
 	bInfoExists = true;
 }
+
 bool NetworkManager::IsConnected() const
 {
 	return bClientConnected && bClientApproved;
 }
 
-//TODO packet data limit
+bool NetworkManager::WaitAllDataFromNet(const std::string& clientName, uint16_t receivedNow)
+{
+    if (m_Type == MANAGER_TYPE::SERVER && !clientName.empty())
+    {
+		//TODO thread safe
+	    if (m_ServerConnections->find(clientName) != m_ServerConnections->end()
+		    && (m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end()))
+        {
+		    auto wanted_bytes = m_ServerPacketConditions->at(clientName).want_to_receive;
+			auto current_byte = m_ServerPacketConditions->at(clientName).current;
+			auto rec_now = wanted_bytes - current_byte;
+			auto buffer = new char[rec_now];
+            auto received = m_ServerConnections->at(clientName)->Receive(&buffer, rec_now);
+			if (received > 0)
+            {
+                std::memcpy((m_ServerPacketConditions->at(clientName).buffer)+current_byte, buffer, received);
+			    current_byte += received;
+				m_ServerPacketConditions->at(clientName).current = current_byte;
+			}
+			delete[] buffer;
+			if (current_byte == wanted_bytes)
+            {
+				return true;
+			}
+		}
+	}
+	else if (m_Type == MANAGER_TYPE::CLIENT)
+    {
+        auto wanted_bytes = m_ClientPacketConditionPtr->want_to_receive;
+        auto current_byte = m_ClientPacketConditionPtr->current;
+        auto rec_now = wanted_bytes - current_byte;
+        auto buffer = new char[rec_now];
+        auto received = m_Socket->Receive(&buffer, rec_now);
+        if (received > 0)
+        {
+            std::memcpy(m_ClientPacketConditionPtr->buffer + current_byte, buffer, received);
+            current_byte += received;
+            m_ClientPacketConditionPtr->current = current_byte;
+        }
+        delete[] buffer;
+        if (current_byte == wanted_bytes)
+        {
+            return true;
+        }
+	}
+	return false;
+}
+
 void ManagerInfo::Write(OutputMemoryBitStream& stream)
 {
 	stream.Write(name);

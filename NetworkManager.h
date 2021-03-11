@@ -80,7 +80,7 @@ public:
 
 	void EndFunction();
 
-    void HandlePacket(const TCPSocketPtr& socket);
+	void HandlePacket(const TCPSocketPtr& socket, const std::string& name = "");
 
     void HandleHelloPacket(const TCPSocketPtr& socket);
 
@@ -140,17 +140,22 @@ protected:
 
 	virtual void Server_HandleClients();
 
-    int bContainSendData:1 = 0;
+	/** Use Init for construction of util struct, and use Destruct after it returned TRUE */
+	bool WaitAllDataFromNet(const std::string& clientName, uint16_t receivedNow);
 
-    int bClientConnected:1 = 0;
+    uint8_t bContainSendData:1 = 0;
 
-    int bClientApproved:1 = 0;
+    uint8_t bClientConnected:1 = 0;
 
-	int bReadyToWriteFunction:1 = 0;
+    uint8_t bClientApproved:1 = 0;
 
-    int bReadyToWritePacket:1 = 0;
+	uint8_t bReadyToWriteFunction:1 = 0;
 
-	int bInfoExists:1 = 0;
+    uint8_t bReadyToWritePacket:1 = 0;
+
+	uint8_t bInfoExists:1 = 0;
+
+	uint8_t bReceivedNotAll:1 = 0;
 
 	std::atomic<bool> bPendingShutdown = false;
 
@@ -176,6 +181,10 @@ private:
 	// User DATA
 	std::unique_ptr<std::unordered_map<std::string, TCPSocketPtr>> m_ServerConnections;
 	std::unique_ptr<std::unordered_map<std::string, ManagerInfo>> m_ServerClientsInfo;
+	std::unique_ptr<std::unordered_map<std::string, struct ReceivePacketInfo>> m_ServerPacketConditions;
+
+	// For Client usage
+	std::unique_ptr<struct ReceivePacketInfo> m_ClientPacketConditionPtr;
 
 	MANAGER_TYPE m_Type;
 

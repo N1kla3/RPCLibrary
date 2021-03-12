@@ -141,7 +141,9 @@ protected:
 	virtual void Server_HandleClients();
 
 	/** Use Init for construction of util struct, and use Destruct after it returned TRUE */
-	bool WaitAllDataFromNet(const std::string& clientName, uint16_t receivedNow);
+	bool WaitAllDataFromNet(const std::string& clientName);
+
+	bool WaitAllPacket(const std::string& clientName);
 
     uint8_t bContainSendData:1 = 0;
 

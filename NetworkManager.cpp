@@ -18,6 +18,7 @@ struct ReceivePacketInfo
     uint16_t want_to_receive = 0;
     uint16_t required_bits = 0;
 	bool is_initialized = false;
+	bool is_len_received = false;
 
     void Init(uint16_t wantToReceive, uint16_t requiredBits)
     {
@@ -238,7 +239,12 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string&
 {
 	if (bReceivedNotAll)
     {
-		//TODO REFORGE IT ALLLLLLLLL
+
+	}
+	if ((m_ServerPacketConditions->find(name) != m_ServerPacketConditions->end())
+	    && (m_ServerPacketConditions->at(name).is_initialized))
+    {
+
 	}
 	PACKET packet;
 	char buf[1];
@@ -487,7 +493,7 @@ bool NetworkManager::IsConnected() const
 	return bClientConnected && bClientApproved;
 }
 
-bool NetworkManager::WaitAllDataFromNet(const std::string& clientName, uint16_t receivedNow)
+bool NetworkManager::WaitAllDataFromNet(const std::string& clientName)
 {
     if (m_Type == MANAGER_TYPE::SERVER && !clientName.empty())
     {
@@ -533,6 +539,55 @@ bool NetworkManager::WaitAllDataFromNet(const std::string& clientName, uint16_t 
         }
 	}
 	return false;
+}
+
+bool NetworkManager::WaitAllPacket(const std::string& clientName)
+{
+    if (m_Type == MANAGER_TYPE::SERVER)
+    {
+		bool client_exists = m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end();
+		if (!client_exists)
+        {
+			LOG_DEBUG("NetworkManager::WaitAllPacket Client not exists - ") << clientName;
+			return false;
+		}
+		if (!m_ServerPacketConditions->at(clientName).is_len_received)
+        {
+		    bool len_rec = WaitAllDataFromNet(clientName);
+			m_ServerPacketConditions->at(clientName).is_len_received = len_rec;
+			if (len_rec)
+            {
+                uint32_t require_bits = *reinterpret_cast<uint32_t *>(m_ServerPacketConditions->at(clientName).buffer);
+                m_ServerPacketConditions->at(clientName).Destroy();
+                m_ServerPacketConditions->at(clientName).Init((require_bits+7)>>3, require_bits);
+                bool receive_all = WaitAllDataFromNet(clientName);
+                if (receive_all) return true;
+			}
+		}
+		else if (m_ServerPacketConditions->at(clientName).is_len_received)
+        {
+            bool res = WaitAllDataFromNet(clientName);
+			if (res) return true;
+		}
+        else if (!m_ServerPacketConditions->at(clientName).is_initialized)
+        {
+			m_ServerPacketConditions->at(clientName).Init(sizeof(uint32_t), 0);
+			bool res = WaitAllDataFromNet(clientName);
+			m_ServerPacketConditions->at(clientName).is_len_received = res;
+			if (res)
+            {
+				uint32_t require_bits = *reinterpret_cast<uint32_t *>(m_ServerPacketConditions->at(clientName).buffer);
+				m_ServerPacketConditions->at(clientName).Destroy();
+				m_ServerPacketConditions->at(clientName).Init((require_bits+7)>>3, require_bits);
+				bool receive_all = WaitAllDataFromNet(clientName);
+				if (receive_all) return true;
+			}
+		}
+	}
+	else if (m_Type == MANAGER_TYPE::CLIENT)
+    {
+
+	}
 }
 
 void ManagerInfo::Write(OutputMemoryBitStream& stream)

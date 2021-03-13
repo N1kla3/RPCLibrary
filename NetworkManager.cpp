@@ -10,7 +10,9 @@
 #include <libnetlink.h>
 #include <memory>
 
-/** Utility structure for non blocking packet receive */
+/**
+ *  @details Utility structure for non blocking packet receive
+ */
 struct ReceivePacketInfo
 {
     char* buffer = nullptr;
@@ -54,7 +56,7 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 	{
 		SocketAddress addr(INADDR_ANY, port);
 		m_Socket->Bind(addr);
-		LOG_INFO("Server at port") << port;
+		LOG_INFO("Creating Server at port ") << port;
 		if (m_Socket->Listen() < 0) LOG_FATAL("SERVER CANT LISTEN");
 		m_AcceptingThread = std::thread(&NetworkManager::AcceptConnections, this);
 		LOG_INFO("Maximum threads supported - ") << std::thread::hardware_concurrency();
@@ -65,23 +67,30 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 	else if (type == MANAGER_TYPE::CLIENT)
 	{
 		m_ClientPacketConditionPtr = std::make_unique<ReceivePacketInfo>();
-		LOG_INFO("Client init");
+		LOG_INFO("Client manager init");
 	}
 }
 
 NetworkManager::~NetworkManager()
 {
 	Server_Shutdown();
-	LOG_INFO("DESTORYING NETWORK MANAGER");
+	LOG_INFO("DESTROYING NETWORK MANAGER");
 }
 
 
-
+/**
+ * @details Set tick frequency
+ * @param frequency Amount of times tick will be executed in one second
+ */
 void NetworkManager::SetNetFrequency(float frequency)
 {
 	m_NetFrequency = frequency;
 }
 
+/**
+ * @details Set manager type
+ * @param mode FREQUENCY or MANUAL
+ */
 void NetworkManager::SetManagerMode(MANAGER_MODE mode)
 {
 	m_Mode = mode;
@@ -92,7 +101,11 @@ MANAGER_MODE NetworkManager::GetManagerMode() const
 	return m_Mode;
 }
 
-/** Client-Side only */
+/**
+ * @attention CLIENT-ONLY
+ * @details Establish connect to a server
+ * @param address address and port of server
+ */
 void NetworkManager::Connect(const std::string& address)
 {
 	if (m_Type == MANAGER_TYPE::CLIENT)
@@ -100,43 +113,45 @@ void NetworkManager::Connect(const std::string& address)
 		if (bClientConnected) return;
 		if (m_Socket->Connect(*SocketFactory::CreateIPv4FromString(address)) < 0)
 		{
-			LOG_ERROR("NetworkManager::Connect ") << address << SocketUtil::GetLastError();
+			LOG_ERROR("NetworkManager::Connect try address") << address << " error code - " << SocketUtil::GetLastError();
 		}
 		else bClientConnected = true;
 
 		if (bClientConnected)
 		{
+			LOG_INFO("Connection established - ") << address;
 			auto packet = PACKET::HELLO;
 			m_Socket->Send(&packet, 1);
 			m_OutStreamPtr = std::make_unique<OutputMemoryBitStream>();
 			SendHello();
-			LOG_INFO("Send info");
+			LOG_DEBUG("Sending our info to Server");
 
 			char buffer[32];
 			for (int i = 0; i < m_ConnectionTimeLimit; i++)
 			{
-				LOG_INFO("Wait result");
+				LOG_DEBUG("Wait answer of server");
 				int received = m_Socket->Receive(buffer, 1);
 				if (received > 0)
 				{
-					LOG_INFO("Received answer");
+					LOG_DEBUG("Received answer");
                     packet = (PACKET)buffer[0];
 					if (packet == HELLO)
 					{
-						LOG_INFO("Connected to Server");
+						LOG_INFO("Connected and accepted to Server");
 						bClientApproved = true;
 						return;
 					}
 					else if (packet == REJECT)
 					{
-						LOG_INFO("Server reject you");
+						LOG_INFO("Server rejects you");
 						bClientConnected = false;
 						return;
 					}
 				}
 				else
 				{
-					LOG_INFO("wait response - ") << i;
+					LOG_DEBUG("Wait response seconds - ") << i;
+					//TODO remake it ::Connect
 					sleep(1);
 				}
 			}
@@ -145,6 +160,10 @@ void NetworkManager::Connect(const std::string& address)
 	else LOG_WARNING("Connect can only be used in client");
 }
 
+/**
+ * @details Handle sending and receiving of packets. Should be executed in loop
+ * @param deltaTime Time from previous call in seconds
+ */
 void NetworkManager::Tick(float deltaTime)
 {
 	if (m_Mode == MANAGER_MODE::FREQUENCY && !bPendingShutdown)
@@ -176,7 +195,11 @@ MANAGER_TYPE NetworkManager::GetManagerType() const noexcept
 	return m_Type;
 }
 
-/** Server-Only */
+/**
+ * @attention SERVER-ONLY
+ * @details Check accepting packet from client on correctness, then accept or rejects client
+ * @param socket Established socket to client
+ */
 void NetworkManager::HandleHelloPacket(const TCPSocketPtr& socket)
 {
 	if (m_Type == MANAGER_TYPE::SERVER)
@@ -205,18 +228,21 @@ void NetworkManager::HandleHelloPacket(const TCPSocketPtr& socket)
 			else
             {
                 SendRejected(socket);
-                LOG_INFO("Client with such name already exits - ") << info.name;
+                LOG_WARNING("Client with such name already exits - ") << info.name;
 			}
 		}
 		else
 		{
-			LOG_WARNING("Client rejected level validation ") << info.name;
+			LOG_WARNING("Client rejected level validation - ") << info.name;
 			SendRejected(socket);
 		}
 	}
 }
 
-/** @brief Read function and executes it */
+/**
+ * @details Read function id, and function parameters from packet, then executes function
+ * @param stream Read from
+ */
 void NetworkManager::HandleFunctionPacket(InputMemoryBitStream& stream)
 {
 	std::string function_id;
@@ -224,7 +250,10 @@ void NetworkManager::HandleFunctionPacket(InputMemoryBitStream& stream)
 	RPCManager::Proccess(function_id, stream);
 }
 
-/** CLIENT ONLY Write to member streams */
+/**
+ * @attention CLIENT-ONLY
+ * @details Send Client info such as name, etc... to server
+ */
 void NetworkManager::SendHello()
 {
 	if (m_Type == MANAGER_TYPE::CLIENT)
@@ -243,6 +272,11 @@ void NetworkManager::SendRejected(const TCPSocketPtr& socket)
 	socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 }
 
+/**
+ * @details Main function to receive packets, if receives function executes it. Remember received data from previous call, non-blocking(almost).
+ * @param socket Established socket
+ * @param name Client names, optional in client (do nothing)
+ */
 void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string& name)
 {
 	if (IsInitilizedPacketBuffer(name))
@@ -256,28 +290,28 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string&
 	if (received > 0)
 	{
         packet = (PACKET)buf[0];
-        LOG_INFO("Prepare packet receive-") << packet;
+        LOG_DEBUG("Prepare packet receive - ") << packet;
 		if (packet == PACKET::DATA)
 		{
-			LOG_INFO("Wait packet");
+			LOG_DEBUG("Wait packet");
             ReadIfReceivePacket(name);
 		}
 		else if (packet == PACKET::REJECT && m_Type == MANAGER_TYPE::CLIENT)
 		{
 			bClientConnected = false;
 			bClientApproved = false;
-			LOG_WARNING("you have been disconnected");
+			LOG_WARNING("You have been disconnected");
 		}
 		else if (packet == PACKET::REJECT && m_Type == MANAGER_TYPE::SERVER)
         {
-			LOG_INFO("receiving disconnect information");
+			LOG_INFO("Receiving disconnect information from - ") << name;
 			socket->SetBlocking();
 			char buffer[512];
 			received = socket->Receive(buffer, sizeof(uint32_t));
 			if (received > 0)
             {
 				uint32_t len = *reinterpret_cast<uint32_t *>(&buffer[0]);
-				LOG_DEBUG("name len ") << len;
+				LOG_DEBUG("Client Name len in bytes - ") << len;
 			    received = socket->Receive(buffer, len);
 				if (received > 0)
                 {
@@ -297,12 +331,16 @@ void NetworkManager::Server_HandleClients()
 	m_ConnectionsMutex.lock();
 	for (auto& [name, socket] : *m_ServerConnections)
 	{
-		 LOG_INFO("handling client ") << name;
+		 LOG_INFO("Handling client now - ") << name;
 		 HandlePacket(socket, name);
 	}
 	m_ConnectionsMutex.unlock();
 }
 
+/**
+ * @attention MANUAL-MODE
+ * @details Replacement of tick in MANUAL mode, but without sending of packets.
+ */
 void NetworkManager::ReceiveData()
 {
 	if (m_Mode == MANAGER_MODE::MANUAL)
@@ -327,6 +365,9 @@ void NetworkManager::EndFunction()
 	}
 }
 
+/**
+ * @details If packet ready, send it
+ */
 void NetworkManager::SendPacket()
 {
     if (bReadyToWritePacket && bContainSendData)
@@ -341,7 +382,7 @@ void NetworkManager::SendPacket()
 				uint32_t len = m_OutStreamPtr->GetBitLength();
 				socket->Send(&len, sizeof(uint32_t));
 				socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
-				LOG_INFO("Send packet to client - ") << name << (m_OutStreamPtr->GetBitLength());
+				LOG_DEBUG("Send packet to client - ") << name << " Packet len in bits - " << (m_OutStreamPtr->GetBitLength());
 			}
 			m_ConnectionsMutex.unlock();
 		}
@@ -352,13 +393,18 @@ void NetworkManager::SendPacket()
             uint32_t len = m_OutStreamPtr->GetBitLength();
             m_Socket->Send(&len, sizeof(uint32_t));
 			m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
-			LOG_INFO("Send packet to server ") << m_OutStreamPtr->GetBitLength();
+			LOG_DEBUG("Send packet to server, bit len - ") << m_OutStreamPtr->GetBitLength();
 		}
 		bContainSendData = false;
 		bReadyToWriteFunction = false;
 		bReadyToWritePacket = false;
 	}
 }
+
+/**
+ * @attention SERVER-ONLY
+ * @details Async function to accept clients
+ */
 void NetworkManager::AcceptConnections()
 {
 	if (m_Type == MANAGER_TYPE::SERVER)
@@ -369,7 +415,7 @@ void NetworkManager::AcceptConnections()
             auto client = m_Socket->Accept(addr);
             if (client)
             {
-				LOG_INFO("Accepting client");
+				LOG_INFO("NetworkManager::AcceptConnections - Accepting client");
                 for (int wait = 0; wait < m_ConnectionTimeLimit; wait++)
                 {
 					char buffer[128];
@@ -385,8 +431,8 @@ void NetworkManager::AcceptConnections()
                             m_InStreamPtr = std::make_unique<InputMemoryBitStream>(buffer, len);
                             HandleHelloPacket(client);
                             break;
+							//TODO make non blocking
                         }
-						else LOG_DEBUG("Hello received");
 					}
 					else LOG_INFO("Thread::Waiting data");
 					LOG_DEBUG("Received but not all");
@@ -397,6 +443,10 @@ void NetworkManager::AcceptConnections()
 	}
 }
 
+/**
+ * @details Sets connection time limit in seconds
+ * @param newLimit Time in seconds
+ */
 void NetworkManager::SetConnectionTimeLimit(int newLimit)
 {
 	if (newLimit > 0)
@@ -410,12 +460,16 @@ int NetworkManager::GetConnectionTimeLimit() const
 	return m_ConnectionTimeLimit;
 }
 
-/** after shutdown better not to use object FOR NOW */
+/**
+ * @attention NOT USABLE AFTER
+ * @details Shutdown server, waiting for accepting thread, and send information about shutdown to connected clients.
+ */
 void NetworkManager::Server_Shutdown()
 {
 	if (bPendingShutdown) return;
 	if (m_Type == MANAGER_TYPE::SERVER)
     {
+		LOG_INFO("Server shutdown started");
         bPendingShutdown = true;
         m_AcceptingThread.join();
         for (auto& [name, socket] : *m_ServerConnections)
@@ -428,31 +482,37 @@ void NetworkManager::Server_Shutdown()
 	}
 }
 
+/**
+ * @details Disconnects client from server.
+ * @param name Client name to disconnect, if exists
+ */
 void NetworkManager::Server_DisconnectClient(std::string name)
 {
 	if (m_Type == MANAGER_TYPE::SERVER)
     {
         m_ConnectionsMutex.lock();
-        LOG_INFO("Start disconnecting");
+        LOG_INFO("Start disconnecting - ") << name;
         auto to_delete_iter = m_ServerConnections->find(name);
         if (to_delete_iter != m_ServerConnections->end())
         {
 			PACKET packet = PACKET::REJECT;
 			to_delete_iter->second->Send(&packet, 1);
             m_ServerConnections->erase(to_delete_iter);
-			LOG_INFO("Disconnecting user ") << name;
+			LOG_INFO("Disconnecting user - ") << name;
         }
 	    auto to_delete_info = m_ServerClientsInfo->find(name);
 		if (to_delete_info != m_ServerClientsInfo->end())
         {
 			m_ServerClientsInfo->erase(to_delete_info);
-			LOG_INFO("Deleting user information of ") << name;
+			LOG_INFO("Deleting user information of - ") << name;
 		}
-
 		m_ConnectionsMutex.unlock();
 	}
 }
 
+/**
+ * @details Self disconnect from server.
+ */
 void NetworkManager::Client_Disconnect()
 {
 	if (m_Type == MANAGER_TYPE::CLIENT)
@@ -465,6 +525,10 @@ void NetworkManager::Client_Disconnect()
 	}
 }
 
+/**
+ * @attention Must be explicitly set or server will rejects you
+ * @param info Client info
+ */
 void NetworkManager::SetManagerInfo(ManagerInfo&& info)
 {
 	if (bInfoExists) return;
@@ -477,6 +541,11 @@ bool NetworkManager::IsConnected() const
 	return bClientConnected && bClientApproved;
 }
 
+/**
+ * @details Remembers data partly received packet, and use it in next call.
+ * @param clientName Name of client.
+ * @return TRUE if packet received without losses.
+ */
 bool NetworkManager::WaitAllDataFromNet(const std::string& clientName)
 {
     if (m_Type == MANAGER_TYPE::SERVER && !clientName.empty())
@@ -525,6 +594,11 @@ bool NetworkManager::WaitAllDataFromNet(const std::string& clientName)
 	return false;
 }
 
+/**
+ * @details Handles non blocking receiving of packet length and packet itself.
+ * @param clientName Name of client.
+ * @return TRUE if packet received
+ */
 bool NetworkManager::WaitAllPacket(const std::string& clientName)
 {
     if (m_Type == MANAGER_TYPE::SERVER)
@@ -624,6 +698,11 @@ bool NetworkManager::WaitAllPacket(const std::string& clientName)
 	return false;
 }
 
+/**
+ * @details Get buffer of partly received packet by client name(optional in Client).
+ * @param clientName Name of client OPTIONAL.
+ * @return nullptr if something going wrong.
+ */
 char* NetworkManager::GetPacket(const std::string& clientName)
 {
 	if (m_Type == MANAGER_TYPE::SERVER)
@@ -640,6 +719,11 @@ char* NetworkManager::GetPacket(const std::string& clientName)
 	return nullptr;
 }
 
+/**
+ * @details Get bits of data packet should consist of.
+ * @param clientName Name of client OPTIONAL.
+ * @return Number of bits, 0 if wrong.
+ */
 uint16_t NetworkManager::GetRequiredBitsFrom(const std::string& clientName)
 {
     if (m_Type == MANAGER_TYPE::SERVER)
@@ -656,6 +740,11 @@ uint16_t NetworkManager::GetRequiredBitsFrom(const std::string& clientName)
 	return 0;
 }
 
+/**
+ * @details If packet received, reinterpret all it data, and executes function if contain.
+ * @param clientName Name of client OPTIONAL
+ * @return TRUE if receive all packet.
+ */
 bool NetworkManager::ReadIfReceivePacket(const std::string& clientName)
 {
 	bool res = WaitAllPacket(clientName);

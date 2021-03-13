@@ -14,7 +14,6 @@ int TCPSocket::Connect(const SocketAddress& inAddress)
     int err = connect(m_Socket, &inAddress.m_SockAddr, inAddress.GetSize());
     if (err < 0)
     {
-        LOG_ERROR("TCPSocket::Connect");
         return -SocketUtil::GetLastError();
     }
     return 0;
@@ -25,7 +24,6 @@ int TCPSocket::Bind(const SocketAddress& inToAddress)
     int error = bind(m_Socket, &inToAddress.m_SockAddr, inToAddress.GetSize());
     if (error != 0)
     {
-        LOG_ERROR("TCPSocket::Bind");
         return SocketUtil::GetLastError();
     }
 
@@ -37,7 +35,6 @@ int TCPSocket::Listen(int inBackLog)
     int err = listen(m_Socket, inBackLog);
     if (err < 0)
     {
-        LOG_ERROR("TCPSocket::Listen");
         return -SocketUtil::GetLastError();
     }
     return 0;
@@ -60,7 +57,6 @@ int32_t TCPSocket::Send(const void* inData, size_t inLen)
     int bytesSentCount = send(m_Socket, static_cast<const char*>(inData), inLen, 0);
     if (bytesSentCount < 0)
     {
-        LOG_ERROR("TCPSocket::Send");
         return -SocketUtil::GetLastError();
     }
     return bytesSentCount;

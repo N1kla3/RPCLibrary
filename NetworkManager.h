@@ -92,7 +92,6 @@ public:
 
 	void SendPacket();
 
-    /** @brief Check received data per second */
     void SetNetFrequency(float frequency);
 
     void SetManagerMode(MANAGER_MODE mode);

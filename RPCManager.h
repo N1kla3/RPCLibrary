@@ -22,7 +22,7 @@ public:
     {
         if (m_WrappedFunctions.find(id) != m_WrappedFunctions.end())
         {
-            LOG_FATAL("Id exists yet");
+            LOG_FATAL("Function Id exists yet");
 			LOG_FATAL("EXITING...");
             std::exit(-1);
         }
@@ -42,7 +42,7 @@ public:
         }
         else
         {
-            LOG_FATAL("Function doesnt exists") << id;
+            LOG_DEBUG("RPCManager::Process Function doesnt exists") << id;
         }
     }
 

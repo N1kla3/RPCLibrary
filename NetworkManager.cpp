@@ -137,7 +137,7 @@ void NetworkManager::Connect(const std::string& address, int port)
 				}
 				else
 				{
-					LOG_INFO("wait responce - ") << i;
+					LOG_INFO("wait response - ") << i;
 					sleep(1);
 				}
 			}
@@ -237,14 +237,10 @@ void NetworkManager::SendRejected(const TCPSocketPtr& socket)
 
 void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string& name)
 {
-	if (bReceivedNotAll)
+	if (IsInitilizedPacketBuffer(name))
     {
-
-	}
-	if ((m_ServerPacketConditions->find(name) != m_ServerPacketConditions->end())
-	    && (m_ServerPacketConditions->at(name).is_initialized))
-    {
-
+	    ReadIfReceivePacket(name);
+		return;
 	}
 	PACKET packet;
 	char buf[1];
@@ -256,27 +252,7 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string&
 		if (packet == PACKET::DATA)
 		{
 			LOG_INFO("Wait packet");
-			//TODO make non blocking
-			uint32_t data_len = 0;
-			received = socket->Receive(&data_len, sizeof(uint32_t));
-			if (received > 0)
-			{
-				char buffer[2048];
-				received = socket->Receive(buffer, data_len);
-				if (received > 0)
-				{
-					InputMemoryBitStream stream(buffer, data_len);
-					while (stream.GetRemainingBitCount() > 0)
-					{
-						LOG_DEBUG("Reading packet buffer") << data_len;
-						stream.ReadBits(&packet, GetRequiredBits<PACKET::MAX>::VALUE);
-						if (packet == PACKET::FUNCTION)
-						{
-							HandleFunctionPacket(stream);
-						}
-					}
-				}
-			}
+            ReadIfReceivePacket(name);
 		}
 		else if (packet == PACKET::REJECT && m_Type == MANAGER_TYPE::CLIENT)
 		{
@@ -561,13 +537,19 @@ bool NetworkManager::WaitAllPacket(const std::string& clientName)
                 m_ServerPacketConditions->at(clientName).Destroy();
                 m_ServerPacketConditions->at(clientName).Init((require_bits+7)>>3, require_bits);
                 bool receive_all = WaitAllDataFromNet(clientName);
-                if (receive_all) return true;
+                if (receive_all)
+                {
+                    return true;
+				}
 			}
 		}
 		else if (m_ServerPacketConditions->at(clientName).is_len_received)
         {
             bool res = WaitAllDataFromNet(clientName);
-			if (res) return true;
+			if (res)
+            {
+                return true;
+			}
 		}
         else if (!m_ServerPacketConditions->at(clientName).is_initialized)
         {
@@ -580,14 +562,144 @@ bool NetworkManager::WaitAllPacket(const std::string& clientName)
 				m_ServerPacketConditions->at(clientName).Destroy();
 				m_ServerPacketConditions->at(clientName).Init((require_bits+7)>>3, require_bits);
 				bool receive_all = WaitAllDataFromNet(clientName);
-				if (receive_all) return true;
+				if (receive_all)
+                {
+                    return true;
+				}
 			}
 		}
 	}
 	else if (m_Type == MANAGER_TYPE::CLIENT)
     {
-
+        if (!m_ClientPacketConditionPtr->is_len_received)
+        {
+            bool len_rec = WaitAllDataFromNet(clientName);
+            m_ClientPacketConditionPtr->is_len_received = len_rec;
+            if (len_rec)
+            {
+                uint32_t require_bits = *reinterpret_cast<uint32_t *>(m_ClientPacketConditionPtr->buffer);
+                m_ClientPacketConditionPtr->Destroy();
+                m_ClientPacketConditionPtr->Init((require_bits+7)>>3, require_bits);
+                bool receive_all = WaitAllDataFromNet(clientName);
+                if (receive_all)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (m_ClientPacketConditionPtr->is_len_received)
+        {
+            bool res = WaitAllDataFromNet(clientName);
+            if (res)
+            {
+                return true;
+            }
+        }
+        else if (!m_ClientPacketConditionPtr->is_initialized)
+        {
+            m_ClientPacketConditionPtr->Init(sizeof(uint32_t), 0);
+            bool res = WaitAllDataFromNet(clientName);
+            m_ClientPacketConditionPtr->is_len_received = res;
+            if (res)
+            {
+                uint32_t require_bits = *reinterpret_cast<uint32_t *>(m_ClientPacketConditionPtr->buffer);
+                m_ClientPacketConditionPtr->Destroy();
+                m_ClientPacketConditionPtr->Init((require_bits+7)>>3, require_bits);
+                bool receive_all = WaitAllDataFromNet(clientName);
+                if (receive_all)
+                {
+                    return true;
+                }
+            }
+        }
 	}
+	return false;
+}
+
+char* NetworkManager::GetPacket(const std::string& clientName)
+{
+	if (m_Type == MANAGER_TYPE::SERVER)
+    {
+		if (m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end())
+        {
+            return m_ServerPacketConditions->at(clientName).buffer;
+        }
+	}
+	else if (m_Type == MANAGER_TYPE::CLIENT)
+    {
+	    return m_ClientPacketConditionPtr->buffer;
+	}
+	return nullptr;
+}
+
+uint16_t NetworkManager::GetRequiredBitsFrom(const std::string& clientName)
+{
+    if (m_Type == MANAGER_TYPE::SERVER)
+    {
+        if (m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end())
+        {
+            return m_ServerPacketConditions->at(clientName).required_bits;
+        }
+    }
+    else if (m_Type == MANAGER_TYPE::CLIENT)
+    {
+        return m_ClientPacketConditionPtr->required_bits;
+    }
+	return 0;
+}
+
+bool NetworkManager::ReadIfReceivePacket(const std::string& clientName)
+{
+	bool res = WaitAllPacket(clientName);
+    if (res)
+    {
+        char* buffer = GetPacket(clientName);
+        auto data_len = GetRequiredBitsFrom(clientName);
+        InputMemoryBitStream stream(buffer, data_len);
+        while (stream.GetRemainingBitCount() > 0)
+        {
+            LOG_DEBUG("Reading packet buffer") << data_len;
+			PACKET packet;
+            stream.ReadBits(&packet, GetRequiredBits<PACKET::MAX>::VALUE);
+            if (packet == PACKET::FUNCTION)
+            {
+                HandleFunctionPacket(stream);
+            }
+        }
+	    DestroyPacketBuffer(clientName);
+    }
+	return res;
+}
+
+bool NetworkManager::IsInitilizedPacketBuffer(const std::string& clientName)
+{
+	if (m_Type == MANAGER_TYPE::SERVER)
+    {
+	    if (m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end())
+        {
+			return m_ServerPacketConditions->at(clientName).IsInit();
+		}
+	}
+	else if (m_Type == MANAGER_TYPE::CLIENT)
+    {
+        return m_ClientPacketConditionPtr->IsInit();
+	}
+	return false;
+}
+
+void NetworkManager::DestroyPacketBuffer(const std::string& clientName)
+{
+    if (m_Type == MANAGER_TYPE::SERVER)
+    {
+        if (m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end())
+        {
+            m_ServerPacketConditions->at(clientName).Destroy();
+        }
+    }
+    else if (m_Type == MANAGER_TYPE::CLIENT)
+    {
+        m_ClientPacketConditionPtr->Destroy();
+    }
 }
 
 void ManagerInfo::Write(OutputMemoryBitStream& stream)

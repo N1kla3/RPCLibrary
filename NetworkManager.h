@@ -143,7 +143,17 @@ protected:
 	/** Use Init for construction of util struct, and use Destruct after it returned TRUE */
 	bool WaitAllDataFromNet(const std::string& clientName);
 
-	bool WaitAllPacket(const std::string& clientName);
+	bool WaitAllPacket(const std::string& clientName = "");
+
+	char* GetPacket(const std::string& clientName = "");
+
+	uint16_t GetRequiredBitsFrom(const std::string& clientName = "");
+
+	bool ReadIfReceivePacket(const std::string& clientName = "");
+
+	bool IsInitilizedPacketBuffer(const std::string& clientName = "");
+
+	void DestroyPacketBuffer(const std::string& clientName = "");
 
     uint8_t bContainSendData:1 = 0;
 

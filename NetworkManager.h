@@ -60,7 +60,7 @@ public:
     template<typename T>
     void AddDataToPacket(T&& value)
     {
-		if (m_ServerConnections->empty()) return;
+		if (m_Type == MANAGER_TYPE::SERVER && m_ServerConnections->empty()) return;
         if (!bReadyToWritePacket)
         {
 		    bReadyToWritePacket = true;

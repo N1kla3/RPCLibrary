@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <vector>
 #include <algorithm>
+#include <chrono>
 
 
 namespace logging = boost::log;
@@ -83,3 +84,22 @@ struct GetRequiredBits {
 #include "RPCManager.h"
 #include "TCPSocket.h"
 #include "SocketUtil.h"
+
+struct Timer
+{
+	Timer(const std::string& functionName)
+    {
+		name = functionName;
+	    start = std::chrono::high_resolution_clock::now();
+	}
+	virtual ~Timer()
+    {
+		end = std::chrono::high_resolution_clock::now();
+		duration = end - start;
+		float ms = duration.count() * 1000.f;
+		LOG_DEBUG(name) << " Took " << ms << "ms";
+	}
+	std::string name;
+	std::chrono::time_point<std::chrono::system_clock> start, end;
+	std::chrono::duration<float> duration;
+};

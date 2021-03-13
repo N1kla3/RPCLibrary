@@ -166,6 +166,7 @@ void NetworkManager::Connect(const std::string& address)
  */
 void NetworkManager::Tick(float deltaTime)
 {
+	Timer timer("NetworkManager::Tick");
 	if (m_Mode == MANAGER_MODE::FREQUENCY && !bPendingShutdown)
 	{
 		float per_second = 1 / m_NetFrequency;

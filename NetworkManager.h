@@ -111,7 +111,7 @@ public:
 
 	[[nodiscard]] bool IsConnected() const;
 
-	void Connect(const std::string& address, int port);
+	void Connect(const std::string& address);
 
     /** @brief Should be called in while, do nothing if MANUAL mode enabled */
     void Tick(float deltaTime);

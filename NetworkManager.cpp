@@ -93,13 +93,12 @@ MANAGER_MODE NetworkManager::GetManagerMode() const
 }
 
 /** Client-Side only */
-void NetworkManager::Connect(const std::string& address, int port)
+void NetworkManager::Connect(const std::string& address)
 {
 	if (m_Type == MANAGER_TYPE::CLIENT)
 	{
 		if (bClientConnected) return;
-        SocketAddress addr(inet_addr(address.c_str()), port);
-		if (m_Socket->Connect(addr) < 0)
+		if (m_Socket->Connect(*SocketFactory::CreateIPv4FromString(address)) < 0)
 		{
 			LOG_ERROR("NetworkManager::Connect ") << address << SocketUtil::GetLastError();
 		}
@@ -192,13 +191,22 @@ void NetworkManager::HandleHelloPacket(const TCPSocketPtr& socket)
 
 		if (validation)
 		{
-			PACKET packet = PACKET::HELLO;
-			socket->Send(&packet, 1);
-			m_ConnectionsMutex.lock();
-			m_ServerConnections->insert(std::make_pair(info.name, socket));
-			m_ServerClientsInfo->insert(std::make_pair(info.name, info));
-			m_ConnectionsMutex.unlock();
-			LOG_INFO("Client added to clients - ") << info.name;
+			if (m_ServerConnections->find(info.name) == m_ServerConnections->end())
+            {
+                PACKET packet = PACKET::HELLO;
+                socket->Send(&packet, 1);
+                m_ConnectionsMutex.lock();
+                m_ServerConnections->insert(std::make_pair(info.name, socket));
+                m_ServerClientsInfo->insert(std::make_pair(info.name, info));
+				m_ServerPacketConditions->insert(std::make_pair(info.name, ReceivePacketInfo()));
+                LOG_INFO("Client added to clients - ") << info.name;
+                m_ConnectionsMutex.unlock();
+			}
+			else
+            {
+                SendRejected(socket);
+                LOG_INFO("Client with such name already exits - ") << info.name;
+			}
 		}
 		else
 		{
@@ -344,7 +352,7 @@ void NetworkManager::SendPacket()
             uint32_t len = m_OutStreamPtr->GetBitLength();
             m_Socket->Send(&len, sizeof(uint32_t));
 			m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
-			LOG_INFO("Send packet to server");
+			LOG_INFO("Send packet to server ") << m_OutStreamPtr->GetBitLength();
 		}
 		bContainSendData = false;
 		bReadyToWriteFunction = false;

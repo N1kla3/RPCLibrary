@@ -52,17 +52,19 @@ NetworkManager::NetworkManager(MANAGER_TYPE type, int port)
 {
 
 	m_Socket = SocketUtil::CreateTCPSocket(INET);
+	m_ServerBindSocket = SocketUtil::CreateTCPSocket(INET);
 	if (type == MANAGER_TYPE::SERVER)
 	{
 		SocketAddress addr(INADDR_ANY, port);
-		m_Socket->Bind(addr);
+		m_ServerBindSocket->Bind(addr);
 		LOG_INFO("Creating Server at port ") << port;
-		if (m_Socket->Listen() < 0) LOG_FATAL("SERVER CANT LISTEN");
+		if (m_ServerBindSocket->Listen() < 0) LOG_FATAL("SERVER CANT LISTEN");
 		m_AcceptingThread = std::thread(&NetworkManager::AcceptConnections, this);
 		LOG_INFO("Maximum threads supported - ") << std::thread::hardware_concurrency();
 		m_ServerConnections = std::make_unique<std::unordered_map<std::string, TCPSocketPtr>>();
         m_ServerClientsInfo = std::make_unique<std::unordered_map<std::string, ManagerInfo>>();
 		m_ServerPacketConditions = std::make_unique<std::unordered_map<std::string, ReceivePacketInfo>>();
+        m_ClientPacketConditionPtr = std::make_unique<ReceivePacketInfo>();
 	}
 	else if (type == MANAGER_TYPE::CLIENT)
 	{
@@ -151,7 +153,6 @@ void NetworkManager::Connect(const std::string& address)
 				else
 				{
 					LOG_DEBUG("Wait response seconds - ") << i;
-					//TODO remake it ::Connect
 					sleep(1);
 				}
 			}
@@ -413,30 +414,31 @@ void NetworkManager::AcceptConnections()
 		while (!bPendingShutdown)
         {
             SocketAddress addr;
-            auto client = m_Socket->Accept(addr);
+            auto client = m_ServerBindSocket->Accept(addr);
+			m_Socket = client;
             if (client)
             {
 				LOG_INFO("NetworkManager::AcceptConnections - Accepting client");
                 for (int wait = 0; wait < m_ConnectionTimeLimit; wait++)
                 {
-					char buffer[128];
+					if (IsInitilizedPacketBuffer())
+                    {
+						LOG_DEBUG("AcceptConnections initilized");
+						if (HandleIfReceiveConnectionPacket(client)) break;
+						else continue;
+					}
+					char buffer[1];
 					auto received = client->Receive(buffer, 1);
 					if (received > 0)
                     {
+						LOG_DEBUG("AcceptConnections hello");
                         PACKET packet = (PACKET)buffer[0];
                         if (packet == HELLO)
                         {
-                            client->Receive(buffer, sizeof(uint32_t));
-                            uint32_t len = *reinterpret_cast<uint32_t *>(&buffer[0]);
-							client->Receive(buffer, len);
-                            m_InStreamPtr = std::make_unique<InputMemoryBitStream>(buffer, len);
-                            HandleHelloPacket(client);
-                            break;
-							//TODO make non blocking
+                            if (HandleIfReceiveConnectionPacket(client)) break;
                         }
 					}
-					else LOG_INFO("Thread::Waiting data");
-					LOG_DEBUG("Received but not all");
+					else LOG_INFO("Thread::Waiting data - ") << wait << " seconds";
                     sleep(1);
                 }
             }
@@ -549,7 +551,26 @@ bool NetworkManager::IsConnected() const
  */
 bool NetworkManager::WaitAllDataFromNet(const std::string& clientName)
 {
-    if (m_Type == MANAGER_TYPE::SERVER && !clientName.empty())
+    if (m_Type == MANAGER_TYPE::CLIENT || clientName.empty())
+    {
+        auto wanted_bytes = m_ClientPacketConditionPtr->want_to_receive;
+        auto current_byte = m_ClientPacketConditionPtr->current;
+        auto rec_now = wanted_bytes - current_byte;
+        auto buffer = new char[rec_now];
+        auto received = m_Socket->Receive(buffer, rec_now);
+        if (received > 0)
+        {
+            std::memcpy(m_ClientPacketConditionPtr->buffer + current_byte, buffer, received);
+            current_byte += received;
+            m_ClientPacketConditionPtr->current = current_byte;
+        }
+        delete[] buffer;
+        if (current_byte == wanted_bytes)
+        {
+            return true;
+        }
+    }
+    else if (m_Type == MANAGER_TYPE::SERVER && !clientName.empty())
     {
 		//TODO thread safe
 	    if (m_ServerConnections->find(clientName) != m_ServerConnections->end()
@@ -573,25 +594,6 @@ bool NetworkManager::WaitAllDataFromNet(const std::string& clientName)
 			}
 		}
 	}
-	else if (m_Type == MANAGER_TYPE::CLIENT)
-    {
-        auto wanted_bytes = m_ClientPacketConditionPtr->want_to_receive;
-        auto current_byte = m_ClientPacketConditionPtr->current;
-        auto rec_now = wanted_bytes - current_byte;
-        auto buffer = new char[rec_now];
-        auto received = m_Socket->Receive(buffer, rec_now);
-        if (received > 0)
-        {
-            std::memcpy(m_ClientPacketConditionPtr->buffer + current_byte, buffer, received);
-            current_byte += received;
-            m_ClientPacketConditionPtr->current = current_byte;
-        }
-        delete[] buffer;
-        if (current_byte == wanted_bytes)
-        {
-            return true;
-        }
-	}
 	return false;
 }
 
@@ -602,7 +604,51 @@ bool NetworkManager::WaitAllDataFromNet(const std::string& clientName)
  */
 bool NetworkManager::WaitAllPacket(const std::string& clientName)
 {
-    if (m_Type == MANAGER_TYPE::SERVER)
+    if (m_Type == MANAGER_TYPE::CLIENT || clientName.empty())
+    {
+        if (!m_ClientPacketConditionPtr->is_initialized)
+        {
+            m_ClientPacketConditionPtr->Init(sizeof(uint32_t), sizeof(uint32_t)<<3);
+            bool res = WaitAllDataFromNet(clientName);
+            m_ClientPacketConditionPtr->is_len_received = res;
+            if (res)
+            {
+                uint32_t require_bits = *reinterpret_cast<uint32_t *>(m_ClientPacketConditionPtr->buffer);
+                m_ClientPacketConditionPtr->Destroy();
+                m_ClientPacketConditionPtr->Init((require_bits+7)>>3, require_bits);
+                bool receive_all = WaitAllDataFromNet(clientName);
+                if (receive_all)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (!m_ClientPacketConditionPtr->is_len_received)
+        {
+            bool len_rec = WaitAllDataFromNet(clientName);
+            m_ClientPacketConditionPtr->is_len_received = len_rec;
+            if (len_rec)
+            {
+                uint32_t require_bits = *reinterpret_cast<uint32_t *>(m_ClientPacketConditionPtr->buffer);
+                m_ClientPacketConditionPtr->Destroy();
+                m_ClientPacketConditionPtr->Init((require_bits+7)>>3, require_bits);
+                bool receive_all = WaitAllDataFromNet(clientName);
+                if (receive_all)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (m_ClientPacketConditionPtr->is_len_received)
+        {
+            bool res = WaitAllDataFromNet(clientName);
+            if (res)
+            {
+                return true;
+            }
+        }
+    }
+    else if (m_Type == MANAGER_TYPE::SERVER)
     {
 		bool client_exists = m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end();
 		if (!client_exists)
@@ -652,50 +698,6 @@ bool NetworkManager::WaitAllPacket(const std::string& clientName)
 			}
 		}
 	}
-	else if (m_Type == MANAGER_TYPE::CLIENT)
-    {
-        if (!m_ClientPacketConditionPtr->is_initialized)
-        {
-            m_ClientPacketConditionPtr->Init(sizeof(uint32_t), sizeof(uint32_t)<<3);
-            bool res = WaitAllDataFromNet(clientName);
-            m_ClientPacketConditionPtr->is_len_received = res;
-            if (res)
-            {
-                uint32_t require_bits = *reinterpret_cast<uint32_t *>(m_ClientPacketConditionPtr->buffer);
-                m_ClientPacketConditionPtr->Destroy();
-                m_ClientPacketConditionPtr->Init((require_bits+7)>>3, require_bits);
-                bool receive_all = WaitAllDataFromNet(clientName);
-                if (receive_all)
-                {
-                    return true;
-                }
-            }
-        }
-        else if (!m_ClientPacketConditionPtr->is_len_received)
-        {
-            bool len_rec = WaitAllDataFromNet(clientName);
-            m_ClientPacketConditionPtr->is_len_received = len_rec;
-            if (len_rec)
-            {
-                uint32_t require_bits = *reinterpret_cast<uint32_t *>(m_ClientPacketConditionPtr->buffer);
-                m_ClientPacketConditionPtr->Destroy();
-                m_ClientPacketConditionPtr->Init((require_bits+7)>>3, require_bits);
-                bool receive_all = WaitAllDataFromNet(clientName);
-                if (receive_all)
-                {
-                    return true;
-                }
-            }
-        }
-        else if (m_ClientPacketConditionPtr->is_len_received)
-        {
-            bool res = WaitAllDataFromNet(clientName);
-            if (res)
-            {
-                return true;
-            }
-        }
-	}
 	return false;
 }
 
@@ -706,16 +708,16 @@ bool NetworkManager::WaitAllPacket(const std::string& clientName)
  */
 char* NetworkManager::GetPacket(const std::string& clientName)
 {
-	if (m_Type == MANAGER_TYPE::SERVER)
+    if (m_Type == MANAGER_TYPE::CLIENT || clientName.empty())
+    {
+        return m_ClientPacketConditionPtr->buffer;
+    }
+	else if (m_Type == MANAGER_TYPE::SERVER)
     {
 		if (m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end())
         {
             return m_ServerPacketConditions->at(clientName).buffer;
         }
-	}
-	else if (m_Type == MANAGER_TYPE::CLIENT)
-    {
-	    return m_ClientPacketConditionPtr->buffer;
 	}
 	return nullptr;
 }
@@ -727,16 +729,16 @@ char* NetworkManager::GetPacket(const std::string& clientName)
  */
 uint16_t NetworkManager::GetRequiredBitsFrom(const std::string& clientName)
 {
-    if (m_Type == MANAGER_TYPE::SERVER)
+    if (m_Type == MANAGER_TYPE::CLIENT || clientName.empty())
+    {
+        return m_ClientPacketConditionPtr->required_bits;
+    }
+    else if (m_Type == MANAGER_TYPE::SERVER)
     {
         if (m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end())
         {
             return m_ServerPacketConditions->at(clientName).required_bits;
         }
-    }
-    else if (m_Type == MANAGER_TYPE::CLIENT)
-    {
-        return m_ClientPacketConditionPtr->required_bits;
     }
 	return 0;
 }
@@ -756,7 +758,7 @@ bool NetworkManager::ReadIfReceivePacket(const std::string& clientName)
         InputMemoryBitStream stream(buffer, data_len);
         while (stream.GetRemainingBitCount() > 0)
         {
-            LOG_DEBUG("Reading packet buffer") << data_len;
+            LOG_DEBUG("Reading packet buffer, bit len - ") << data_len;
 			PACKET packet = PACKET::MAX;
             stream.ReadBits(&packet, GetRequiredBits<PACKET::MAX>::VALUE);
             if (packet == PACKET::FUNCTION)
@@ -771,33 +773,55 @@ bool NetworkManager::ReadIfReceivePacket(const std::string& clientName)
 
 bool NetworkManager::IsInitilizedPacketBuffer(const std::string& clientName)
 {
-	if (m_Type == MANAGER_TYPE::SERVER)
+    if (m_Type == MANAGER_TYPE::CLIENT || clientName.empty())
+    {
+        return m_ClientPacketConditionPtr->IsInit();
+    }
+	else if (m_Type == MANAGER_TYPE::SERVER)
     {
 	    if (m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end())
         {
 			return m_ServerPacketConditions->at(clientName).IsInit();
 		}
 	}
-	else if (m_Type == MANAGER_TYPE::CLIENT)
-    {
-        return m_ClientPacketConditionPtr->IsInit();
-	}
 	return false;
 }
 
 void NetworkManager::DestroyPacketBuffer(const std::string& clientName)
 {
-    if (m_Type == MANAGER_TYPE::SERVER)
+    if (m_Type == MANAGER_TYPE::CLIENT || clientName.empty())
+    {
+        m_ClientPacketConditionPtr->Destroy();
+    }
+    else if (m_Type == MANAGER_TYPE::SERVER)
     {
         if (m_ServerPacketConditions->find(clientName) != m_ServerPacketConditions->end())
         {
             m_ServerPacketConditions->at(clientName).Destroy();
         }
     }
-    else if (m_Type == MANAGER_TYPE::CLIENT)
+}
+
+/**
+ * @attention SERVER-ONLY
+ * @details Wait Packet about client info, then call NetworkManager::HandleHelloPacket.
+ * @param socket Client socket.
+ * @return TRUE if receive all.
+ */
+bool NetworkManager::HandleIfReceiveConnectionPacket(const TCPSocketPtr& socket)
+{
+	if (m_Type == MANAGER_TYPE::SERVER)
     {
-        m_ClientPacketConditionPtr->Destroy();
-    }
+        bool res = WaitAllPacket();
+        if (res)
+        {
+            m_InStreamPtr = std::make_unique<InputMemoryBitStream>(GetPacket(), GetRequiredBitsFrom());
+            HandleHelloPacket(socket);
+            DestroyPacketBuffer();
+        }
+		return res;
+	}
+	return false;
 }
 
 void ManagerInfo::Write(OutputMemoryBitStream& stream)

@@ -112,22 +112,16 @@ public:
 
 	void Connect(const std::string& address);
 
-    /** @brief Should be called in while, do nothing if MANUAL mode enabled */
     void Tick(float deltaTime);
 
-    /** @brief In manual mode, executes all received functions */
     void ReceiveData();
 
-	/** @brief SERVER-ONLY, Async function to accept clients, */
 	void AcceptConnections();
 
-	/** SERVER-ONLY */
 	void Server_Shutdown();
 
-	/** SERVER-ONLY */
 	void Server_DisconnectClient(std::string name);
 
-	/** CLIENT-ONLY */
 	void Client_Disconnect();
 
 protected:
@@ -139,7 +133,6 @@ protected:
 
 	virtual void Server_HandleClients();
 
-	/** Use Init for construction of util struct, and use Destruct after it returned TRUE */
 	bool WaitAllDataFromNet(const std::string& clientName);
 
 	bool WaitAllPacket(const std::string& clientName = "");
@@ -149,6 +142,8 @@ protected:
 	uint16_t GetRequiredBitsFrom(const std::string& clientName = "");
 
 	bool ReadIfReceivePacket(const std::string& clientName = "");
+
+	bool HandleIfReceiveConnectionPacket(const TCPSocketPtr& socket);
 
 	bool IsInitilizedPacketBuffer(const std::string& clientName = "");
 
@@ -183,6 +178,8 @@ protected:
     std::unique_ptr<class OutputMemoryBitStream> m_OutStreamPtr;
 
     TCPSocketPtr m_Socket;
+
+	TCPSocketPtr m_ServerBindSocket;
 
     ManagerInfo m_Info;
 

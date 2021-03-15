@@ -27,6 +27,7 @@ private:
 	std::string RemoveModifiers(std::string str);
 	std::string&& RemoveConst(std::string&& argument);
 	std::string&& RemoveRef(std::string&& argument);
+	std::string&& RemoveVolatile(std::string&& argument);
 
 	// Generation utility functions
 	void GenerateReadDeclaration();

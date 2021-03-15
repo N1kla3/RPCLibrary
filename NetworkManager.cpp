@@ -307,7 +307,6 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string&
 		else if (packet == PACKET::REJECT && m_Type == MANAGER_TYPE::SERVER)
         {
 			LOG_INFO("Receiving disconnect information from - ") << name;
-			socket->SetBlocking();
 			char buffer[512];
 			received = socket->Receive(buffer, sizeof(uint32_t));
 			if (received > 0)
@@ -320,12 +319,14 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string&
                     InputMemoryBitStream stream(buffer, len << 3);
                     std::string name;
                     stream.Read(name);
+                    LOG_DEBUG("mmmmm ") << name;
                     Server_DisconnectClient(name);
-				}
+				}//TODO make non blocking
 			}
-			socket->SetNonBlocking();
 		}
+		else LOG_DEBUG("Receive some shit!!!");
 	}
+	else LOG_DEBUG("Nothing receive!");
 }
 
 void NetworkManager::Server_HandleClients()
@@ -493,7 +494,6 @@ void NetworkManager::Server_DisconnectClient(std::string name)
 {
 	if (m_Type == MANAGER_TYPE::SERVER)
     {
-        m_ConnectionsMutex.lock();
         LOG_INFO("Start disconnecting - ") << name;
         auto to_delete_iter = m_ServerConnections->find(name);
         if (to_delete_iter != m_ServerConnections->end())
@@ -505,11 +505,10 @@ void NetworkManager::Server_DisconnectClient(std::string name)
         }
 	    auto to_delete_info = m_ServerClientsInfo->find(name);
 		if (to_delete_info != m_ServerClientsInfo->end())
-        {
+        {//TODO erase by key
 			m_ServerClientsInfo->erase(to_delete_info);
 			LOG_INFO("Deleting user information of - ") << name;
 		}
-		m_ConnectionsMutex.unlock();
 	}
 }
 
@@ -521,9 +520,13 @@ void NetworkManager::Client_Disconnect()
 	if (m_Type == MANAGER_TYPE::CLIENT)
     {
         OutputMemoryBitStream stream;
-		stream.WriteBits(PACKET::REJECT, GetRequiredBits<PACKET::MAX>::VALUE);
-		stream.Write((uint32_t)m_Info.name.size());
 		stream.Write(m_Info.name);
+
+		OutputMemoryBitStream info_stream;
+		info_stream.WriteBits(PACKET::REJECT, 8);//Byte len, cause HandlePacket get bytes
+		info_stream.Write(stream.GetByteLength());
+
+		m_Socket->Send(info_stream.GetBufferPtr(), info_stream.GetByteLength());
 		m_Socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
 	}
 }

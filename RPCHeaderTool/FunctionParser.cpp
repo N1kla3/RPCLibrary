@@ -193,5 +193,15 @@ std::string&& FunctionParser::RemoveRef(std::string&& argument)
 
 std::string FunctionParser::RemoveModifiers(std::string str)
 {
-	return RemoveConst(RemoveRef(std::move(str)));
+	return RemoveVolatile(RemoveConst(RemoveRef(std::move(str))));
+}
+
+std::string&& FunctionParser::RemoveVolatile(std::string&& argument)
+{
+	auto begin = argument.find("volatile");
+	if (begin != std::string::npos)
+    {
+		argument.erase(begin, begin+8);
+	}
+	return std::move(argument);
 }

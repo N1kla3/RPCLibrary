@@ -74,23 +74,11 @@ public:
 		if (bReadyToWritePacket && bReadyToWriteFunction)
         {
 			m_OutStreamPtr->Write(std::forward<T>(value));
-			LOG_INFO("writing value to packet");
+			//LOG_INFO("writing value to packet");
 		}
     }
 
 	void EndFunction();
-
-	void HandlePacket(const TCPSocketPtr& socket, const std::string& name = "");
-
-    void HandleHelloPacket(const TCPSocketPtr& socket);
-
-    void HandleFunctionPacket(InputMemoryBitStream& stream);
-
-    void SendHello();
-
-    void SendRejected(const TCPSocketPtr& socket);
-
-	void SendPacket();
 
     void SetNetFrequency(float frequency);
 
@@ -115,8 +103,6 @@ public:
     void Tick(float deltaTime);
 
     void ReceiveData();
-
-	void AcceptConnections();
 
 	void Server_Shutdown();
 
@@ -148,6 +134,21 @@ protected:
 	bool IsInitilizedPacketBuffer(const std::string& clientName = "");
 
 	void DestroyPacketBuffer(const std::string& clientName = "");
+
+    // Packet functions
+    void HandlePacket(const TCPSocketPtr& socket, const std::string& name = "");
+
+    void HandleHelloPacket(const TCPSocketPtr& socket);
+
+    void HandleFunctionPacket(InputMemoryBitStream& stream);
+
+    void SendHello();
+
+    void SendRejected(const TCPSocketPtr& socket);
+
+    void SendPacket();
+
+    void AcceptConnections();
 
     uint8_t bContainSendData:1 = 0;
 

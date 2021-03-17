@@ -817,9 +817,15 @@ bool NetworkManager::HandleIfReceiveConnectionPacket(const TCPSocketPtr& socket)
 void ManagerInfo::Write(OutputMemoryBitStream& stream)
 {
 	stream.Write(name);
+	stream.Write(password);
+	stream.Write(email);
+	stream.Write(something);
 }
 
 void ManagerInfo::Read(InputMemoryBitStream& stream)
 {
 	stream.Read(name);
+	stream.Read(password);
+	stream.Read(email);
+	stream.Read(something);
 }

@@ -13,7 +13,10 @@
 
 struct ManagerInfo
 {
-    std::string name;
+    std::string name{};
+	std::string password{};
+	std::string email{};
+	int something{};
 
     void Write(class OutputMemoryBitStream& stream);
     void Read(class InputMemoryBitStream& stream);

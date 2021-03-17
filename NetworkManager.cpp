@@ -220,6 +220,7 @@ void NetworkManager::HandleHelloPacket(const TCPSocketPtr& socket)
             {
                 PACKET packet = PACKET::HELLO;
                 socket->Send(&packet, 1);
+				if (SocketUtil::GetLastError() == EPIPE) return;
                 m_ConnectionsMutex.lock();
                 m_ServerConnections->insert(std::make_pair(info.name, socket));
                 m_ServerClientsInfo->insert(std::make_pair(info.name, info));
@@ -306,22 +307,7 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string&
 		}
 		else if (packet == PACKET::REJECT && m_Type == MANAGER_TYPE::SERVER)
         {
-			LOG_INFO("Receiving disconnect information from - ") << name;
-			char buffer[512];
-			received = socket->Receive(buffer, sizeof(uint32_t));
-			if (received > 0)
-            {
-				uint32_t len = *reinterpret_cast<uint32_t *>(&buffer[0]);
-				LOG_DEBUG("Client Name len in bytes - ") << len;
-			    received = socket->Receive(buffer, len);
-				if (received > 0)
-                {
-                    InputMemoryBitStream stream(buffer, len << 3);
-                    std::string rec_name;
-                    stream.Read(rec_name);
-                    Server_DisconnectClient(rec_name);
-				}//TODO make non blocking
-			}
+			Server_DisconnectClient(name);
 		}
 		else LOG_DEBUG("Receive some shit!!!");
 	}
@@ -398,6 +384,7 @@ void NetworkManager::SendPacket()
             {
 				PACKET packet = PACKET::DATA;
 				socket->Send(&packet, 1);
+				if (SocketUtil::GetLastError() == EPIPE) Server_DisconnectClient(name);
 				uint32_t len = m_OutStreamPtr->GetBitLength();
 				socket->Send(&len, sizeof(uint32_t));
 				socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
@@ -409,6 +396,7 @@ void NetworkManager::SendPacket()
         {
             PACKET packet = PACKET::DATA;
             m_Socket->Send(&packet, 1);
+			if (SocketUtil::GetLastError() == EPIPE) Client_Disconnect();
             uint32_t len = m_OutStreamPtr->GetBitLength();
             m_Socket->Send(&len, sizeof(uint32_t));
 			m_Socket->Send(m_OutStreamPtr->GetBufferPtr(), m_OutStreamPtr->GetByteLength());
@@ -511,7 +499,6 @@ void NetworkManager::Server_DisconnectClient(std::string name)
 	if (m_Type == MANAGER_TYPE::SERVER)
     {
 		m_PendingDisconnectClients.emplace_back(name);
-
 	}
 }
 
@@ -522,15 +509,12 @@ void NetworkManager::Client_Disconnect()
 {
 	if (m_Type == MANAGER_TYPE::CLIENT)
     {
-        OutputMemoryBitStream stream;
-		stream.Write(m_Info.name);
-
 		OutputMemoryBitStream info_stream;
 		info_stream.WriteBits(PACKET::REJECT, 8);//Byte len, cause HandlePacket get bytes
-		info_stream.Write(stream.GetByteLength());
-
 		m_Socket->Send(info_stream.GetBufferPtr(), info_stream.GetByteLength());
-		m_Socket->Send(stream.GetBufferPtr(), stream.GetByteLength());
+		bClientConnected = false;
+		bClientApproved = false;
+		LOG_INFO("Disconnected from server");
 	}
 }
 

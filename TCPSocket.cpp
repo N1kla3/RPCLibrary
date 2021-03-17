@@ -54,7 +54,7 @@ std::shared_ptr<TCPSocket> TCPSocket::Accept(SocketAddress& inFromAddress)
 
 int32_t TCPSocket::Send(const void* inData, size_t inLen)
 {
-    int bytesSentCount = send(m_Socket, static_cast<const char*>(inData), inLen, 0);
+    int bytesSentCount = send(m_Socket, static_cast<const char*>(inData), inLen, MSG_NOSIGNAL);
     if (bytesSentCount < 0)
     {
         return -SocketUtil::GetLastError();

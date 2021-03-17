@@ -317,10 +317,9 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string&
 				if (received > 0)
                 {
                     InputMemoryBitStream stream(buffer, len << 3);
-                    std::string name;
-                    stream.Read(name);
-                    LOG_DEBUG("mmmmm ") << name;
-                    Server_DisconnectClient(name);
+                    std::string rec_name;
+                    stream.Read(rec_name);
+                    Server_DisconnectClient(rec_name);
 				}//TODO make non blocking
 			}
 		}
@@ -331,12 +330,29 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string&
 
 void NetworkManager::Server_HandleClients()
 {
+    if (m_ServerConnections->empty()) return;
 	m_ConnectionsMutex.lock();
+	LOG_INFO(m_ServerConnections->size());
 	for (auto& [name, socket] : *m_ServerConnections)
 	{
 		 LOG_INFO("Handling client now - ") << name;
 		 HandlePacket(socket, name);
 	}
+	for (const auto& name : m_PendingDisconnectClients)
+    {
+        LOG_INFO("Start disconnecting - ") << name;
+        auto to_delete_iter = m_ServerConnections->find(name);
+        if (to_delete_iter != m_ServerConnections->end())
+        {
+            PACKET packet = PACKET::REJECT;
+            to_delete_iter->second->Send(&packet, 1);
+            m_ServerConnections->erase(to_delete_iter);
+            LOG_INFO("Disconnecting user - ") << name;
+        }
+        bool info_res = m_ServerClientsInfo->erase(name);
+        if (info_res) LOG_INFO("Deleting user information of - ") << name;
+	}
+	m_PendingDisconnectClients.clear();
 	m_ConnectionsMutex.unlock();
 }
 
@@ -494,21 +510,8 @@ void NetworkManager::Server_DisconnectClient(std::string name)
 {
 	if (m_Type == MANAGER_TYPE::SERVER)
     {
-        LOG_INFO("Start disconnecting - ") << name;
-        auto to_delete_iter = m_ServerConnections->find(name);
-        if (to_delete_iter != m_ServerConnections->end())
-        {
-			PACKET packet = PACKET::REJECT;
-			to_delete_iter->second->Send(&packet, 1);
-            m_ServerConnections->erase(to_delete_iter);
-			LOG_INFO("Disconnecting user - ") << name;
-        }
-	    auto to_delete_info = m_ServerClientsInfo->find(name);
-		if (to_delete_info != m_ServerClientsInfo->end())
-        {//TODO erase by key
-			m_ServerClientsInfo->erase(to_delete_info);
-			LOG_INFO("Deleting user information of - ") << name;
-		}
+		m_PendingDisconnectClients.emplace_back(name);
+
 	}
 }
 

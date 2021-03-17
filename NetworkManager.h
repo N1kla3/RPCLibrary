@@ -192,6 +192,8 @@ private:
 	std::unique_ptr<std::unordered_map<std::string, ManagerInfo>> m_ServerClientsInfo;
 	std::unique_ptr<std::unordered_map<std::string, struct ReceivePacketInfo>> m_ServerPacketConditions;
 
+	std::vector<std::string> m_PendingDisconnectClients{};
+
 	// For Client usage
 	std::unique_ptr<struct ReceivePacketInfo> m_ClientPacketConditionPtr;
 

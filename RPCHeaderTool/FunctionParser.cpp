@@ -112,7 +112,8 @@ void FunctionParser::GenerateReadDeclaration()
 void FunctionParser::GenerateWriteDeclaration()
 {
 	std::ostringstream stream;
-	stream << "void write_" << name << "(class NetworkManager& manager,";
+	stream << "void write_" << name << "(class NetworkManager& manager";
+	if (!m_Args.empty()) stream << ", ";
     for (auto index = 0; index < m_Args.size() || index < m_ArgsTypes.size(); index++)
     {
 		stream << m_ArgsTypes[index] << " " << m_Args[index];

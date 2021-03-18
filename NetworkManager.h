@@ -89,7 +89,7 @@ public:
 
     void SetSecurityLevel(SECURITY_LEVEL level) noexcept {m_Level = level;};
 
-	inline void SetConnectionTimeLimit(int newLimit);
+	void SetConnectionTimeLimit(int newLimit);
 
 	void SetManagerInfo(ManagerInfo&& info);
 

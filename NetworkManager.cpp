@@ -170,13 +170,13 @@ void NetworkManager::Tick(float deltaTime)
 	Timer timer("NetworkManager::Tick");
 	if (m_Mode == MANAGER_MODE::FREQUENCY && !bPendingShutdown)
 	{
-		float per_second = 1 / m_NetFrequency;
-		if (per_second < deltaTime + m_PreviousDelta)
+		float wait_seconds = 1 / m_NetFrequency;
+		if (wait_seconds > deltaTime + m_PreviousDelta)
 		{
 			m_PreviousDelta = deltaTime + m_PreviousDelta;
 			return;
 		}
-		else if (per_second > deltaTime + m_PreviousDelta)
+		else if (wait_seconds < deltaTime + m_PreviousDelta)
 		{
 			m_PreviousDelta = 0.f;
 		}

@@ -139,7 +139,7 @@ protected:
 	void DestroyPacketBuffer(const std::string& clientName = "");
 
     // Packet functions
-    void HandlePacket(const TCPSocketPtr& socket, const std::string& name = "");
+	bool HandlePacket(const TCPSocketPtr& socket, const std::string& name = "");
 
     void HandleHelloPacket(const TCPSocketPtr& socket);
 

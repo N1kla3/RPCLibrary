@@ -186,7 +186,7 @@ void NetworkManager::Tick(float deltaTime)
 		}
 		else if (m_Type == MANAGER_TYPE::CLIENT && bClientConnected && bClientApproved)
 		{
-			HandlePacket(m_Socket);
+			while(HandlePacket(m_Socket));
 		}
 		SendPacket();
 	}
@@ -280,12 +280,12 @@ void NetworkManager::SendRejected(const TCPSocketPtr& socket)
  * @param socket Established socket
  * @param name Client names, optional in client (do nothing)
  */
-void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string& name)
+bool NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string& name)
 {
 	if (IsInitilizedPacketBuffer(name))
     {
 	    ReadIfReceivePacket(name);
-		return;
+		return true;
 	}
 	PACKET packet = PACKET::MAX;
 	char buf[1];
@@ -310,8 +310,13 @@ void NetworkManager::HandlePacket(const TCPSocketPtr& socket, const std::string&
 			Server_DisconnectClient(name);
 		}
 		else LOG_DEBUG("Receive some shit!!!");
+		return true;
 	}
-	else LOG_DEBUG("Nothing receive!");
+	else
+    {
+		return false;
+        LOG_DEBUG("Nothing receive!");
+	}
 }
 
 void NetworkManager::Server_HandleClients()
@@ -322,7 +327,7 @@ void NetworkManager::Server_HandleClients()
 	for (auto& [name, socket] : *m_ServerConnections)
 	{
 		 LOG_INFO("Handling client now - ") << name;
-		 HandlePacket(socket, name);
+		 while(HandlePacket(socket, name));
 	}
 	for (const auto& name : m_PendingDisconnectClients)
     {
@@ -352,7 +357,7 @@ void NetworkManager::ReceiveData()
 	{
 		if (m_Type == MANAGER_TYPE::CLIENT)
         {
-			HandlePacket(m_Socket);
+			while(HandlePacket(m_Socket));
 		}
 		else if (m_Type == MANAGER_TYPE::SERVER)
         {
